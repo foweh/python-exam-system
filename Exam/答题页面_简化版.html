@@ -265,7 +265,7 @@
             if (q.type === '程序填空' || q.type === '程序改错') {
                 const userBlanks = Array.isArray(userAnswers[index]) ? userAnswers[index] : [];
                 let bkIdx = 0;
-                displayText = qText.replace(/<code>([\s\S]*?)<\/code>/g, (match, codeContent) => {
+                displayText = qText.replace(/<div class="code-block">([\s\S]*?)<\/div>/g, (match, codeContent) => {
                     let modifiedCode = codeContent.replace(/\?\?|\[\?\]|【\?】|【(\d+)】/g, (m, num) => {
                         const idx = num ? parseInt(num) - 1 : bkIdx++;
                         const val = userBlanks[idx] || '';

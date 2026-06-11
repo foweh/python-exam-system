@@ -1196,7 +1196,7 @@
             if (question.type === '程序填空' || question.type === '程序改错') {
                 const userBlanks = Array.isArray(userAnswers[index]) ? userAnswers[index] : [];
                 let bkIdx = 0;
-                displayText = qText.replace(/<code>([\s\S]*?)<\/code>/g, (match, codeContent) => {
+                displayText = qText.replace(/<div class="code-block">([\s\S]*?)<\/div>/g, (match, codeContent) => {
                     let modifiedCode = codeContent.replace(/\?\?|\[\?\]|【\?】|【(\d+)】/g, (m, num) => {
                         const idx = num ? parseInt(num) - 1 : bkIdx++;
                         const val = userBlanks[idx] || '';
@@ -1570,10 +1570,6 @@
         function resetExam() {
             if (!confirm('确定要重新开始吗？当前答题记录将被清除。')) return;
             userAnswers = {};
-            wrongCounts = {};
-            wrongUserAnswers = {};
-            localStorage.removeItem('exam_wrong_counts');
-            localStorage.removeItem('exam_wrong_answers');
             currentIndex = 0;
             showAnswers = false;
             if (typeof stopTimer === 'function') stopTimer();
