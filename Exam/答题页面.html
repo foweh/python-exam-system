@@ -260,6 +260,36 @@
             display: inline-block; padding: 0 4px; font-weight: 700;
             color: #667eea; font-size: 13px;
         }
+
+        /* ====== 错题本列表视图 ====== */
+        .wrong-list { display: flex; flex-direction: column; gap: 16px; }
+        .wrong-card {
+            background: white; border-radius: 12px; padding: 18px 20px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06); border-left: 4px solid #ef4444;
+            transition: box-shadow 0.2s;
+        }
+        .wrong-card:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+        .wrong-card-header { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
+        .wrong-card-type { background: #ef4444; color: white; padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+        .wrong-card-id { font-size: 13px; color: #999; }
+        .wrong-card-count { font-size: 12px; color: #ef4444; font-weight: 600; margin-left: auto; }
+        .wrong-card-question { font-size: 14px; color: #333; margin-bottom: 10px; line-height: 1.6; word-break: break-all; }
+        .wrong-card-question .code-block { font-size: 12px; padding: 10px; margin: 6px 0; }
+        .wrong-card-answers { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+        @media (max-width: 600px) { .wrong-card-answers { grid-template-columns: 1fr; } }
+        .wrong-answer-box { padding: 8px 12px; border-radius: 6px; font-size: 13px; }
+        .wrong-answer-box.wrong { background: #fef2f2; border-left: 3px solid #ef4444; }
+        .wrong-answer-box.correct { background: #f0fdf4; border-left: 3px solid #22c55e; }
+        .wrong-answer-box .label { font-weight: 600; font-size: 12px; display: block; margin-bottom: 2px; }
+        .wrong-answer-box.wrong .label { color: #ef4444; }
+        .wrong-answer-box.correct .label { color: #22c55e; }
+        .wrong-answer-box .value { color: #333; font-family: 'Consolas', monospace; word-break: break-all; }
+        .wrong-card-analysis { font-size: 13px; color: #78350f; background: #fffbeb; padding: 10px 14px; border-radius: 6px; margin-bottom: 10px; line-height: 1.5; }
+        .wrong-card-analysis .title { font-weight: 600; margin-bottom: 2px; }
+        .wrong-card-btn { padding: 6px 16px; border: 1px solid #667eea; background: white; color: #667eea; border-radius: 6px; cursor: pointer; font-size: 13px; transition: all 0.2s; }
+        .wrong-card-btn:hover { background: #667eea; color: white; }
+        .wrong-list-empty { text-align: center; padding: 60px 20px; color: #999; font-size: 15px; }
+        .wrong-list-empty .icon { font-size: 48px; margin-bottom: 12px; }
     </style>
 </head>
 <body>
@@ -275,6 +305,7 @@
     <div class="mode-switch">
         <button class="mode-btn active" onclick="setMode('practice')">📚 练习模式</button>
         <button class="mode-btn" onclick="setMode('exam')">⏱️ 考试模式</button>
+        <button class="mode-btn" onclick="setMode('wrongpractice')" id="wrongPracticeBtn" style="display:none;">🎯 错题练习</button>
     </div>
     
     <div class="container">
@@ -1063,7 +1094,13 @@
             currentMode = mode;
             examSubmitted = false;
             document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
-            event.target.classList.add('active');
+            // 高亮当前模式按钮
+            const modeBtnMap = { practice: 0, exam: 1, wrongpractice: 2 };
+            const allBtns = document.querySelectorAll('.mode-btn');
+            if (allBtns[modeBtnMap[mode]]) allBtns[modeBtnMap[mode]].classList.add('active');
+            // 显示/隐藏错题练习按钮
+            const wpBtn = document.getElementById('wrongPracticeBtn');
+            if (wpBtn) wpBtn.style.display = Object.keys(wrongCounts).length > 0 ? 'inline-block' : 'none';
             if (mode === 'practice') {
                 document.getElementById('modeDesc').textContent = '📝 练习模式：点击即显示答案，支持填空题输入、编程题在线编写代码';
                 document.getElementById('examWarning').style.display = 'none';
@@ -1071,12 +1108,38 @@
                 stopTimer();
                 remainingTime = 30 * 60;
                 showAnswers = false;
+                filteredIndices = null;
+                currentTab = '全部';
+                renderTabs();
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                const firstTab = document.querySelector('.tab');
+                if (firstTab) firstTab.classList.add('active');
+            } else if (mode === 'wrongpractice') {
+                document.getElementById('modeDesc').textContent = '🎯 错题练习：只练习做错的题目，巩固薄弱知识点';
+                document.getElementById('examWarning').style.display = 'none';
+                document.getElementById('timer').style.display = 'none';
+                stopTimer();
+                showAnswers = false;
+                currentTab = '全部';
+                // 筛选出错题，按答错次数降序
+                const sorted = questions
+                    .map((q, i) => ({ i, c: wrongCounts[i] || 0 }))
+                    .filter(x => x.c > 0)
+                    .sort((a, b) => b.c - a.c);
+                filteredIndices = sorted.map(x => x.i);
+                if (filteredIndices.length > 0) {
+                    currentIndex = filteredIndices[0];
+                } else {
+                    filteredIndices = null;
+                    currentIndex = 0;
+                }
             } else {
                 document.getElementById('modeDesc').textContent = '⏱️ 考试模式：30分钟限时，选择后立即显示正误，提交后无法修改';
                 document.getElementById('examWarning').style.display = 'block';
                 document.getElementById('timer').style.display = 'flex';
                 userAnswers = {};
                 showAnswers = false;
+                filteredIndices = null;
                 startTimer();
             }
             updateStats();
@@ -1139,17 +1202,7 @@
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             event.target.classList.add('active');
             currentTab = '错题本';
-            // 按答错次数降序排列
-            const sorted = questions
-                .map((q, i) => ({ q, i, c: wrongCounts[i] || 0 }))
-                .filter(x => x.c > 0)
-                .sort((a, b) => b.c - a.c);
-            filteredIndices = sorted.map(x => x.i);
-            if (sorted.length > 0) {
-                currentIndex = sorted[0].i;
-            }
-            renderQuestion(currentIndex);
-            updateStats();
+            renderWrongList();
         }
 
         function renderQuestion(index) {
@@ -1406,6 +1459,8 @@
                 saveWrongData();
                 localStorage.removeItem('exam_wrong_counts');
                 localStorage.removeItem('exam_wrong_answers');
+                // 如果正在错题练习模式，切回练习模式
+                if (currentMode === 'wrongpractice') { setMode('practice'); return; }
                 const wrongBtn = document.getElementById('wrongTabBtn');
                 if (wrongBtn) wrongBtn.textContent = '❌ 错题本';
                 updateStats();
@@ -1420,7 +1475,7 @@
             const wrongCount = Object.keys(wrongCounts).length;
             const wrongBtn = document.getElementById('wrongTabBtn');
             if (wrongBtn) wrongBtn.textContent = '❌ 错题本' + (wrongCount > 0 ? ' (' + wrongCount + ')' : '');
-            // 如果当前在错题本标签，切换到下一题或返回全部
+            // 如果当前在错题本标签，重新渲染列表或返回全部
             if (currentTab === '错题本') {
                 const sorted = questions
                     .map((q, i) => ({ i, c: wrongCounts[i] || 0 }))
@@ -1428,7 +1483,7 @@
                     .sort((a, b) => b.c - a.c);
                 filteredIndices = sorted.map(x => x.i);
                 if (sorted.length > 0) {
-                    currentIndex = sorted[0].i;
+                    renderWrongList();
                 } else {
                     currentTab = '全部';
                     currentIndex = 0;
@@ -1437,7 +1492,10 @@
                     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
                     const allTab = document.querySelector('.tab');
                     if (allTab) allTab.classList.add('active');
+                    renderQuestion(currentIndex);
                 }
+                updateStats();
+                return; // 已在 renderWrongList 中调用 updateStats
             }
             renderQuestion(currentIndex);
             updateStats();
@@ -1504,6 +1562,93 @@
             }
         }
 
+        // ====== 错题本列表视图 ======
+        function renderWrongList() {
+            const container = document.getElementById('questionContainer');
+            const sorted = questions
+                .map((q, i) => ({ q, i, c: wrongCounts[i] || 0 }))
+                .filter(x => x.c > 0)
+                .sort((a, b) => b.c - a.c);
+            if (sorted.length === 0) {
+                container.innerHTML = '<div class="wrong-list-empty"><div class="icon">✅</div>暂无错题，继续保持！</div>';
+                updateStats();
+                return;
+            }
+            let html = '<div class="wrong-list">';
+            sorted.forEach((item, idx) => {
+                const q = item.q;
+                const i = item.i;
+                const count = item.c;
+                const userAns = wrongUserAnswers[i];
+                // 提取纯文本题干
+                let qText = (q.title || q.question || '').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+                if (qText.length > 120) qText = qText.substring(0, 120) + '…';
+                // 用户答错的选项文字（单选）
+                let userDisplay = '';
+                if (q.options && typeof userAns === 'string') {
+                    const optIdx = userAns.charCodeAt(0) - 65;
+                    if (optIdx >= 0 && optIdx < q.options.length) {
+                        userDisplay = q.options[optIdx];
+                    } else {
+                        userDisplay = userAns;
+                    }
+                } else if (Array.isArray(userAns)) {
+                    userDisplay = userAns.filter(v => v).join('; ') || '(未填写)';
+                } else if (userAns) {
+                    userDisplay = String(userAns).substring(0, 80);
+                } else {
+                    userDisplay = '(未作答)';
+                }
+                // 正确答案显示
+                let correctDisplay = '';
+                if (q.options && typeof q.answer === 'string') {
+                    const optIdx = q.answer.charCodeAt(0) - 65;
+                    if (optIdx >= 0 && optIdx < q.options.length) {
+                        correctDisplay = q.answer + '. ' + q.options[optIdx];
+                    } else {
+                        correctDisplay = q.answer;
+                    }
+                } else if (Array.isArray(q.answer)) {
+                    correctDisplay = q.answer.join('; ');
+                } else {
+                    correctDisplay = String(q.answer || '');
+                }
+                const shortQ = qText;
+
+                html += `<div class="wrong-card">
+                    <div class="wrong-card-header">
+                        <span class="wrong-card-type">${q.type}</span>
+                        <span class="wrong-card-id">第 #${idx + 1}</span>
+                        <span class="wrong-card-count">❌ 答错 ${count} 次</span>
+                    </div>
+                    <div class="wrong-card-question">${shortQ}</div>
+                    <div class="wrong-card-answers">
+                        <div class="wrong-answer-box wrong">
+                            <span class="label">✗ 你的答案</span>
+                            <span class="value">${escapeHtml(userDisplay)}</span>
+                        </div>
+                        <div class="wrong-answer-box correct">
+                            <span class="label">✓ 正确答案</span>
+                            <span class="value">${escapeHtml(correctDisplay)}</span>
+                        </div>
+                    </div>
+                    ${q.analysis ? `<div class="wrong-card-analysis"><div class="title">📖 解析</div>${q.analysis}</div>` : ''}
+                    <button class="wrong-card-btn" onclick="practiceWrongQuestion(${i})">🎯 练习本题</button>
+                </div>`;
+            });
+            html += '</div>';
+            container.innerHTML = html;
+            updateStats();
+        }
+
+        // ====== 从列表进入错题练习 ======
+        function practiceWrongQuestion(index) {
+            setMode('wrongpractice');
+            currentIndex = index;
+            renderQuestion(index);
+            updateStats();
+        }
+
         function prevQuestion() {
             if (filteredIndices) {
                 const pos = filteredIndices.indexOf(currentIndex);
@@ -1565,6 +1710,8 @@
             document.getElementById('wrongCount').textContent = wrongCount;
             const wrongBtn = document.getElementById('wrongTabBtn');
             if (wrongBtn) wrongBtn.textContent = '❌ 错题本' + (wrongCount > 0 ? ' (' + wrongCount + ')' : '');
+            const wpBtn = document.getElementById('wrongPracticeBtn');
+            if (wpBtn) wpBtn.style.display = wrongCount > 0 && currentMode !== 'wrongpractice' ? 'inline-block' : 'none';
             const clearBtn = document.getElementById('clearWrongBtn');
             if (clearBtn) clearBtn.style.display = wrongCount > 0 && currentMode === 'practice' ? 'inline-block' : 'none';
         }
