@@ -1050,6 +1050,7 @@
         let wrongCounts = {};    // 错题本：{index: 答错次数}
         let wrongUserAnswers = {};  // 错题本：记录用户在错题上的选择 {index: userAnswer}
         let currentTab = '全部';   // 当前选中的标签
+        let filteredIndices = null; // 当前筛选的题号列表（null=全部）
 
         function init() {
             loadWrongData();
@@ -1127,6 +1128,7 @@
             event.target.classList.add('active');
             currentTab = type;
             const filtered = type === '全部' ? questions : questions.filter(q => q.type === type);
+            filteredIndices = type === '全部' ? null : filtered.map(q => questions.indexOf(q));
             if (filtered.length > 0) {
                 currentIndex = questions.indexOf(filtered[0]);
                 renderQuestion(currentIndex);
@@ -1138,12 +1140,13 @@
             event.target.classList.add('active');
             currentTab = '错题本';
             // 按答错次数降序排列
-            const filtered = questions
+            const sorted = questions
                 .map((q, i) => ({ q, i, c: wrongCounts[i] || 0 }))
                 .filter(x => x.c > 0)
                 .sort((a, b) => b.c - a.c);
-            if (filtered.length > 0) {
-                currentIndex = filtered[0].i;
+            filteredIndices = sorted.map(x => x.i);
+            if (sorted.length > 0) {
+                currentIndex = sorted[0].i;
             }
             renderQuestion(currentIndex);
             updateStats();
@@ -1423,11 +1426,13 @@
                     .map((q, i) => ({ i, c: wrongCounts[i] || 0 }))
                     .filter(x => x.c > 0)
                     .sort((a, b) => b.c - a.c);
+                filteredIndices = sorted.map(x => x.i);
                 if (sorted.length > 0) {
                     currentIndex = sorted[0].i;
                 } else {
                     currentTab = '全部';
                     currentIndex = 0;
+                    filteredIndices = null;
                     // 重置标签高亮
                     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
                     const allTab = document.querySelector('.tab');
@@ -1500,7 +1505,14 @@
         }
 
         function prevQuestion() {
-            if (currentIndex > 0) {
+            if (filteredIndices) {
+                const pos = filteredIndices.indexOf(currentIndex);
+                if (pos > 0) {
+                    currentIndex = filteredIndices[pos - 1];
+                    showAnswers = false;
+                    renderQuestion(currentIndex);
+                }
+            } else if (currentIndex > 0) {
                 currentIndex--;
                 showAnswers = false;
                 renderQuestion(currentIndex);
@@ -1508,7 +1520,14 @@
         }
 
         function nextQuestion() {
-            if (currentIndex < questions.length - 1) {
+            if (filteredIndices) {
+                const pos = filteredIndices.indexOf(currentIndex);
+                if (pos < filteredIndices.length - 1) {
+                    currentIndex = filteredIndices[pos + 1];
+                    showAnswers = false;
+                    renderQuestion(currentIndex);
+                }
+            } else if (currentIndex < questions.length - 1) {
                 currentIndex++;
                 showAnswers = false;
                 renderQuestion(currentIndex);
@@ -1516,8 +1535,14 @@
         }
 
         function updateNavButtons() {
-            document.getElementById('prevBtn').disabled = currentIndex === 0;
-            document.getElementById('nextBtn').disabled = currentIndex === questions.length - 1;
+            if (filteredIndices) {
+                const pos = filteredIndices.indexOf(currentIndex);
+                document.getElementById('prevBtn').disabled = pos <= 0;
+                document.getElementById('nextBtn').disabled = pos >= filteredIndices.length - 1;
+            } else {
+                document.getElementById('prevBtn').disabled = currentIndex === 0;
+                document.getElementById('nextBtn').disabled = currentIndex === questions.length - 1;
+            }
         }
 
         function updateStats() {
