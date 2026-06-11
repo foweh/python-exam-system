@@ -1257,7 +1257,6 @@
                             <div class="code-editor">
                                 <div class="code-editor-header">
                                     <span class="code-lang-label"><span class="code-lang-dot"></span> Python</span>
-                                    ${currentMode === 'practice' ? `<button class="btn-code btn-ref" onclick="toggleAnswer(${index})">${showAnswers ? '隐藏答案' : '参考答案'}</button>` : ''}
                                 </div>
                                 <div class="code-editor-body">
                                     <div class="code-line-nums" id="lineNums_${index}">${lineNumsHtml}</div>
@@ -1322,7 +1321,6 @@
             // ---------- 底部按钮 ----------
             if (question.type !== '程序设计') {
                 html += `<div class="btn-group">
-                    ${currentMode === 'practice' ? `<button class="btn btn-secondary" onclick="toggleAnswer(${index})">${showAnswers ? '隐藏答案' : '查看答案'}</button>` : ''}
                     ${currentMode === 'practice' && wrongSet.has(index) ? `<button class="btn btn-secondary" style="background:#fef3c7;color:#92400e;" onclick="removeFromWrong(${index})">✓ 移出错题本</button>` : ''}
                 </div>`;
             } else {
@@ -1389,11 +1387,6 @@
             if (currentMode === 'practice') updateWrongSet(index);
             renderQuestion(index);
             updateStats();
-        }
-
-        function toggleAnswer(index) {
-            showAnswers = !showAnswers;
-            renderQuestion(index);
         }
 
         // ====== 答案对比（支持数组/字符串，忽略大小写和首尾空白） ======

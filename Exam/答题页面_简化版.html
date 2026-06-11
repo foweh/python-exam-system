@@ -322,7 +322,6 @@
                     <div class="code-editor">
                         <div class="code-editor-header">
                             <span class="code-lang-label"><span class="code-lang-dot"></span> Python</span>
-                            ${currentMode === 'practice' ? '<button class="btn-code btn-ref" onclick="toggleAnswer(' + index + ')">' + (showAnswers ? '隐藏答案' : '参考答案') + '</button>' : ''}
                         </div>
                         <div class="code-editor-body">
                             <div class="code-line-nums" id="lineNums_${index}">${lineNumsHtml}</div>
@@ -359,11 +358,7 @@
             
             // —— 底部按钮 ——
             if (q.type !== '程序设计') {
-                html += '<div class="btn-group">';
-                if (currentMode === 'practice') {
-                    html += '<button class="btn btn-secondary" onclick="toggleAnswer(' + index + ')">' + (showAnswers ? '隐藏答案' : '查看答案') + '</button>';
-                }
-                html += '</div>';
+                html += '<div class="btn-group"></div>';
             }
             html += '</div>';
             
@@ -397,11 +392,6 @@
                 for (let i = 1; i <= Math.max(lines, 1); i++) html += '<span>' + i + '</span>';
                 numsEl.innerHTML = html;
             }
-        }
-        
-        function toggleAnswer(index) {
-            showAnswers = !showAnswers;
-            renderQuestion(index);
         }
         
         function prevQuestion() {
