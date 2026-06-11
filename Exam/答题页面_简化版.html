@@ -165,6 +165,7 @@
         let wrongUserAnswers = {}; // 错题本：记录用户在错题上的选择 {index: userAnswer}
         
         function init() {
+            loadWrongData();
             if (typeof pythonExamBank === 'undefined') {
                 document.getElementById('questionContainer').innerHTML = '<p style="color: red; text-align: center; padding: 40px;">题库加载失败！请确保 exam_data.js 文件存在。</p>';
                 return;
@@ -411,6 +412,7 @@
                 wrongCounts[index] = (wrongCounts[index] || 0) + 1;
                 wrongUserAnswers[index] = ans;
             }
+            saveWrongData();
         }
         
         function updateLineNums(index, textarea) {
@@ -421,6 +423,35 @@
                 for (let i = 1; i <= Math.max(lines, 1); i++) html += '<span>' + i + '</span>';
                 numsEl.innerHTML = html;
             }
+        }
+        
+        // ====== 错题本 localStorage 缓存 ======
+        function saveWrongData() {
+            try {
+                localStorage.setItem('exam_wrong_counts', JSON.stringify(wrongCounts));
+                localStorage.setItem('exam_wrong_answers', JSON.stringify(wrongUserAnswers));
+            } catch(e) { /* ignore */ }
+        }
+        function loadWrongData() {
+            try {
+                const saved = localStorage.getItem('exam_wrong_counts');
+                if (saved) wrongCounts = JSON.parse(saved);
+                const savedAns = localStorage.getItem('exam_wrong_answers');
+                if (savedAns) wrongUserAnswers = JSON.parse(savedAns);
+            } catch(e) { /* ignore */ }
+        }
+        
+        // ====== 重新开始（只清答题记录，不清错题本） ======
+        function resetExam() {
+            if (!confirm('确定要重新开始吗？当前答题记录将被清除。')) return;
+            userAnswers = {};
+            currentIndex = 0;
+            showAnswers = false;
+            if (typeof closeResult === 'function') closeResult();
+            document.getElementById('overlay').classList.remove('show');
+            document.getElementById('resultModal').classList.remove('show');
+            updateStats();
+            renderQuestion(currentIndex);
         }
         
         function prevQuestion() {

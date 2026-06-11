@@ -1401,6 +1401,8 @@
                 wrongCounts = {};
                 wrongUserAnswers = {};
                 saveWrongData();
+                localStorage.removeItem('exam_wrong_counts');
+                localStorage.removeItem('exam_wrong_answers');
                 const wrongBtn = document.getElementById('wrongTabBtn');
                 if (wrongBtn) wrongBtn.textContent = '❌ 错题本';
                 updateStats();
