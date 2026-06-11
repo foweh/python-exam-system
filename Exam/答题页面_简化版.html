@@ -262,11 +262,20 @@
             }
             
             // —— 程序填空/程序改错：代码块中的 ?? / [?] / 【?】/【N】替换为输入框 ——
+            // 如果没有空白标记，则提供完整代码编辑器
             let displayText = qText;
+            let hasProgramEditor = false;
+            let programEditorCode = '';
             if (q.type === '程序填空' || q.type === '程序改错') {
                 const userBlanks = Array.isArray(userAnswers[index]) ? userAnswers[index] : [];
                 let bkIdx = 0;
                 displayText = qText.replace(/<div class="code-block">([\s\S]*?)<\/div>/g, (match, codeContent) => {
+                    const hasBlanks = /\?\?/.test(codeContent) || /\[\?\]/.test(codeContent) || /【\?】/.test(codeContent) || /【\d+】/.test(codeContent);
+                    if (!hasBlanks) {
+                        programEditorCode = (userAnswers[index] && typeof userAnswers[index] === 'string' ? userAnswers[index] : codeContent);
+                        hasProgramEditor = true;
+                        return match;
+                    }
                     let modifiedCode = codeContent.replace(/\?\?|\[\?\]|【\?】|【(\d+)】/g, (m, num) => {
                         const idx = num ? parseInt(num) - 1 : bkIdx++;
                         const val = userBlanks[idx] || '';
@@ -291,6 +300,27 @@
                     ${showFeedback ? `<span class="question-type ${isCorrect ? 'correct' : 'wrong'}">${isCorrect ? '✓ 正确' : '✗ 错误'}</span>` : ''}
                 </div>
                 <div class="question-title">${titleHtml}</div>`;
+            
+            // —— 程序改错/程序填空无空白标记 → 代码编辑器 ——
+            if (hasProgramEditor) {
+                if (!userAnswers[index] || typeof userAnswers[index] !== 'string') {
+                    userAnswers[index] = programEditorCode;
+                }
+                const savedCode = userAnswers[index] || '';
+                const codeLines = Math.max(savedCode.split('\n').length, 1);
+                let lineNumsHtml = '';
+                for (let i = 1; i <= codeLines; i++) lineNumsHtml += '<span>' + i + '</span>';
+                html += '<div class="code-editor">' +
+                    '<div class="code-editor-header">' +
+                        '<span class="code-lang-label"><span class="code-lang-dot"></span> Python</span>' +
+                        '<span style="color:#858585;font-size:12px;">💡 在下方编辑器中修复代码</span>' +
+                    '</div>' +
+                    '<div class="code-editor-body">' +
+                        '<div class="code-line-nums" id="lineNums_' + index + '">' + lineNumsHtml + '</div>' +
+                        '<textarea class="code-textarea" id="codeArea_' + index + '" spellcheck="false" ' + (showFeedback ? 'disabled' : '') + ' oninput="saveCodeAnswer(' + index + ',this);updateLineNums(' + index + ',this)">' + savedCode + '</textarea>' +
+                    '</div>' +
+                '</div>';
+            }
             
             // —— 单选题选项 ——
             if (q.options) {
@@ -350,7 +380,10 @@
                         q.answer.forEach((a, i) => { ansHtml += '<div class="blank-item"><span>[' + (i + 1) + ']</span><span>' + escapeHtml(a) + '</span></div>'; });
                     } else { ansHtml += escapeHtml(q.answer); }
                 } else if (q.type === '程序改错') {
-                    if (Array.isArray(q.answer)) {
+                    if (hasProgramEditor) {
+                        const refCode = Array.isArray(q.answer) ? q.answer.join('\n') : (q.answer || '');
+                        ansHtml += '<pre style="white-space:pre-wrap;background:#1e1e1e;color:#d4d4d4;padding:16px;border-radius:8px;font-size:14px;font-family:Consolas,monospace;">' + refCode.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</pre>';
+                    } else if (Array.isArray(q.answer)) {
                         q.answer.forEach((a, i) => { ansHtml += '<div class="fix-item">修正' + (i + 1) + ': ' + escapeHtml(a) + '</div>'; });
                     } else { ansHtml += escapeHtml(q.answer); }
                 } else if (q.type === '程序设计') {
@@ -486,10 +519,13 @@
         
         function isAnswerCorrect(question, userAnswer) {
             if (userAnswer === undefined || userAnswer === null) return false;
-            // 编程题：包含匹配
-            if (question.type === '程序设计') {
+            // 编程题/程序改错无空白（代码编辑器版本）：包含匹配
+            if (question.type === '程序设计' ||
+                ((question.type === '程序改错' || question.type === '程序填空') && typeof userAnswer === 'string')) {
                 if (!userAnswer) return false;
-                const expected = String(question.answer || '').trim().toLowerCase();
+                const expected = Array.isArray(question.answer)
+                    ? String(question.answer[0] || '').trim().toLowerCase()
+                    : String(question.answer || '').trim().toLowerCase();
                 const user = String(userAnswer).trim().toLowerCase();
                 return user.length > 0 && (user.includes(expected) || expected.includes(user));
             }

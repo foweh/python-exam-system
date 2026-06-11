@@ -1247,12 +1247,28 @@
                 }
             }
             
-            // 程序填空/程序改错：将 <code> 块中的 ?? / [?] / 【?】替换为输入框
+            // 程序填空/程序改错：将代码块中的 ?? / [?] / 【?】/【N】替换为输入框
+            // 如果没有空白标记，则提供完整代码编辑器
             let displayText = qText;
+            let hasProgramEditor = false;
+            let programEditorCode = '';
             if (question.type === '程序填空' || question.type === '程序改错') {
                 const userBlanks = Array.isArray(userAnswers[index]) ? userAnswers[index] : [];
                 let bkIdx = 0;
+                let blankFound = false;
                 displayText = qText.replace(/<div class="code-block">([\s\S]*?)<\/div>/g, (match, codeContent) => {
+                    // 检查是否有空白标记
+                    const hasBlanks = /\?\?/.test(codeContent) || /\[\?\]/.test(codeContent) || /【\?】/.test(codeContent) || /【\d+】/.test(codeContent);
+                    if (!hasBlanks) {
+                        // 无空白标记 → 提供完整代码编辑器
+                        blankFound = false; // 标记后续处理
+                        // 保留代码块在题目中作为视觉参考
+                        // 额外在下方渲染编辑器
+                        programEditorCode = (userAnswers[index] && typeof userAnswers[index] === 'string' ? userAnswers[index] : codeContent);
+                        hasProgramEditor = true;
+                        return match; // 保留原代码块
+                    }
+                    blankFound = true;
                     let modifiedCode = codeContent.replace(/\?\?|\[\?\]|【\?】|【(\d+)】/g, (m, num) => {
                         const idx = num ? parseInt(num) - 1 : bkIdx++;
                         const val = userBlanks[idx] || '';
@@ -1278,6 +1294,28 @@
                     ${showFeedback ? `<span class="question-type ${isCorrect ? 'correct' : 'wrong'}">${isCorrect ? '✓ 正确' : '✗ 错误'}</span>` : ''}
                 </div>
                 <div class="question-title">${titleHtml}</div>`;
+
+            // ---------- 程序改错/程序填空无空白标记 → 代码编辑器 ----------
+            if (hasProgramEditor) {
+                // 初始化用户代码（如果未设置）
+                if (!userAnswers[index] || typeof userAnswers[index] !== 'string') {
+                    userAnswers[index] = programEditorCode;
+                }
+                const savedCode = userAnswers[index] || '';
+                const codeLines = Math.max(savedCode.split('\n').length, 1);
+                let lineNumsHtml = '';
+                for (let i = 1; i <= codeLines; i++) lineNumsHtml += `<span>${i}</span>`;
+                html += `<div class="code-editor">
+                    <div class="code-editor-header">
+                        <span class="code-lang-label"><span class="code-lang-dot"></span> Python</span>
+                        <span style="color:#858585;font-size:12px;">💡 在下方编辑器中修复代码</span>
+                    </div>
+                    <div class="code-editor-body">
+                        <div class="code-line-nums" id="lineNums_${index}">${lineNumsHtml}</div>
+                        <textarea class="code-textarea" id="codeArea_${index}" spellcheck="false" ${showFeedback ? 'disabled' : ''} oninput="saveCodeAnswer(${index},this);updateLineNums(${index},this)">${savedCode}</textarea>
+                    </div>
+                </div>`;
+            }
 
             // ---------- 单选题选项 ----------
             if (question.options) {
@@ -1361,7 +1399,11 @@
                         answerSection += question.answer;
                     }
                 } else if (question.type === '程序改错') {
-                    if (Array.isArray(question.answer)) {
+                    // 检测是否是无空白标记的代码编辑器版本
+                    if (hasProgramEditor) {
+                        const refCode = Array.isArray(question.answer) ? question.answer.join('\n') : (question.answer || '');
+                        answerSection += `<pre style="white-space: pre-wrap;background:#1e1e1e;color:#d4d4d4;padding:16px;border-radius:8px;font-size:14px;">${refCode.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</pre>`;
+                    } else if (Array.isArray(question.answer)) {
                         question.answer.forEach((ans, i) => {
                             answerSection += `<div class="fix-item">修正${i + 1}: ${ans}</div>`;
                         });
@@ -1512,11 +1554,15 @@
         // ====== 答案对比（支持数组/字符串，忽略大小写和首尾空白） ======
         function isAnswerCorrect(question, userAnswer) {
             if (userAnswer === undefined || userAnswer === null) return false;
-            // 编程题：包含匹配（用户代码包含参考答案关键内容即可）
-            if (question.type === '程序设计') {
+            // 编程题/程序改错/程序填空（无空白标记版）：包含匹配
+            if ((question.type === '程序设计') ||
+                ((question.type === '程序改错' || question.type === '程序填空') && typeof userAnswer === 'string')) {
                 if (!userAnswer) return false;
-                const expected = String(question.answer || '').trim().toLowerCase();
                 const user = String(userAnswer).trim().toLowerCase();
+                const expected = Array.isArray(question.answer)
+                    ? String(question.answer[0] || '').trim().toLowerCase()
+                    : String(question.answer || '').trim().toLowerCase();
+                if (!expected || !user) return false;
                 return user.includes(expected) || expected.includes(user);
             }
             if (Array.isArray(question.answer)) {
