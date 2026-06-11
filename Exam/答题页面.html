@@ -1052,6 +1052,7 @@
         let currentTab = '全部';   // 当前选中的标签
 
         function init() {
+            loadWrongData();
             renderTabs();
             renderQuestion(currentIndex);
             updateStats();
@@ -1136,9 +1137,13 @@
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             event.target.classList.add('active');
             currentTab = '错题本';
-            const filtered = questions.filter((_, i) => wrongCounts[i]);
+            // 按答错次数降序排列
+            const filtered = questions
+                .map((q, i) => ({ q, i, c: wrongCounts[i] || 0 }))
+                .filter(x => x.c > 0)
+                .sort((a, b) => b.c - a.c);
             if (filtered.length > 0) {
-                currentIndex = questions.indexOf(filtered[0]);
+                currentIndex = filtered[0].i;
             }
             renderQuestion(currentIndex);
             updateStats();
@@ -1371,6 +1376,23 @@
             const wrongCount = Object.keys(wrongCounts).length;
             const wrongBtn = document.getElementById('wrongTabBtn');
             if (wrongBtn) wrongBtn.textContent = '❌ 错题本' + (wrongCount > 0 ? ' (' + wrongCount + ')' : '');
+            saveWrongData();
+        }
+
+        // ====== 错题本 localStorage 缓存 ======
+        function saveWrongData() {
+            try {
+                localStorage.setItem('exam_wrong_counts', JSON.stringify(wrongCounts));
+                localStorage.setItem('exam_wrong_answers', JSON.stringify(wrongUserAnswers));
+            } catch(e) { /* ignore */ }
+        }
+        function loadWrongData() {
+            try {
+                const saved = localStorage.getItem('exam_wrong_counts');
+                if (saved) wrongCounts = JSON.parse(saved);
+                const savedAns = localStorage.getItem('exam_wrong_answers');
+                if (savedAns) wrongUserAnswers = JSON.parse(savedAns);
+            } catch(e) { /* ignore */ }
         }
 
         function clearWrongSet() {
@@ -1378,6 +1400,7 @@
             if (confirm('确定清除所有错题记录吗？')) {
                 wrongCounts = {};
                 wrongUserAnswers = {};
+                saveWrongData();
                 const wrongBtn = document.getElementById('wrongTabBtn');
                 if (wrongBtn) wrongBtn.textContent = '❌ 错题本';
                 updateStats();
@@ -1388,14 +1411,18 @@
         function removeFromWrong(index) {
             delete wrongCounts[index];
             delete wrongUserAnswers[index];
+            saveWrongData();
             const wrongCount = Object.keys(wrongCounts).length;
             const wrongBtn = document.getElementById('wrongTabBtn');
             if (wrongBtn) wrongBtn.textContent = '❌ 错题本' + (wrongCount > 0 ? ' (' + wrongCount + ')' : '');
             // 如果当前在错题本标签，切换到下一题或返回全部
             if (currentTab === '错题本') {
-                const filtered = questions.filter((_, i) => wrongCounts[i]);
-                if (filtered.length > 0) {
-                    currentIndex = questions.indexOf(filtered[0]);
+                const sorted = questions
+                    .map((q, i) => ({ i, c: wrongCounts[i] || 0 }))
+                    .filter(x => x.c > 0)
+                    .sort((a, b) => b.c - a.c);
+                if (sorted.length > 0) {
+                    currentIndex = sorted[0].i;
                 } else {
                     currentTab = '全部';
                     currentIndex = 0;
@@ -1545,6 +1572,8 @@
             userAnswers = {};
             wrongCounts = {};
             wrongUserAnswers = {};
+            localStorage.removeItem('exam_wrong_counts');
+            localStorage.removeItem('exam_wrong_answers');
             currentIndex = 0;
             showAnswers = false;
             if (typeof stopTimer === 'function') stopTimer();
