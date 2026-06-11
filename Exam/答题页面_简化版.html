@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Python编程考试答题系统</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -147,6 +150,7 @@
             <button class="nav-btn" id="prevBtn" onclick="prevQuestion()" disabled>上一题</button>
             <button class="nav-btn btn-success" onclick="submitAnswers()">📋 提交答案</button>
             <button class="nav-btn" id="nextBtn" onclick="nextQuestion()">下一题</button>
+            <button class="nav-btn" style="border-color:#ef4444;color:#ef4444;" onclick="resetExam()">🔄 重新开始</button>
         </div>
     </div>
 
@@ -157,6 +161,8 @@
         let currentIndex = 0;
         let userAnswers = {};
         let showAnswers = false;
+        let wrongCounts = {};     // 错题本：{index: 答错次数}
+        let wrongUserAnswers = {}; // 错题本：记录用户在错题上的选择 {index: userAnswer}
         
         function init() {
             if (typeof pythonExamBank === 'undefined') {
@@ -330,11 +336,14 @@
                     </div>`;
             }
             
-            // —— 参考答案区域 ——
-            const shouldShow = showAnswers || hasAnswer;
+            // —— 参考答案区域（没作答时完全不显示） ——
             let ansHtml = '';
-            if (q.type === '填空' || q.type === '程序填空' || q.type === '程序改错' || q.type === '程序设计') {
-                ansHtml = '<div class="answer-section' + (shouldShow ? ' show' : '') + '"><div class="answer-label">参考答案：</div><div class="answer-content">';
+            if (!hasAnswer) {
+                ansHtml = '';
+            } else {
+                const shouldShow = showAnswers || hasAnswer;
+                if (q.type === '填空' || q.type === '程序填空' || q.type === '程序改错' || q.type === '程序设计') {
+                    ansHtml = '<div class="answer-section' + (shouldShow ? ' show' : '') + '"><div class="answer-label">参考答案：</div><div class="answer-content">';
                 if (q.type === '填空' || q.type === '程序填空') {
                     if (Array.isArray(q.answer)) {
                         q.answer.forEach((a, i) => { ansHtml += '<div class="blank-item"><span>[' + (i + 1) + ']</span><span>' + escapeHtml(a) + '</span></div>'; });
@@ -349,10 +358,11 @@
                 ansHtml += '</div>';
                 if (q.analysis) { ansHtml += '<div class="analysis-box"><div class="title">📖 解析：</div>' + q.analysis + '</div>'; }
                 ansHtml += '</div>';
-            } else {
+                } else {
                 ansHtml = '<div class="answer-section' + (shouldShow ? ' show' : '') + '"><div class="answer-label">参考答案：</div><div class="answer-content">' + (q.answer || '') + '</div>';
                 if (q.analysis) { ansHtml += '<div class="analysis-box"><div class="title">📖 解析：</div>' + q.analysis + '</div>'; }
                 ansHtml += '</div>';
+                }
             }
             html += ansHtml;
             
@@ -368,6 +378,7 @@
         
         function selectOption(index, letter) {
             userAnswers[index] = letter;
+            updateWrongSet(index);
             renderQuestion(index);
             updateStats();
         }
@@ -375,6 +386,7 @@
         function saveBlankAnswer(index, blankIdx, value) {
             if (!Array.isArray(userAnswers[index])) userAnswers[index] = [];
             userAnswers[index][blankIdx] = value;
+            updateWrongSet(parseInt(index));
             renderQuestion(parseInt(index));
             updateStats();
         }
@@ -382,6 +394,23 @@
         function saveCodeAnswer(index, textarea) {
             userAnswers[index] = textarea.value;
             updateStats();
+        }
+
+        // ====== 错题本：记录答错次数 ======
+        function updateWrongSet(index) {
+            const q = questions[index];
+            const ans = userAnswers[index];
+            if (ans === undefined || ans === null || ans === '') return;
+            // 对填空/编程题，检查是否有任何输入
+            const hasContent = Array.isArray(ans) ? ans.some(v => v) : Boolean(ans);
+            if (!hasContent) return;
+            if (isAnswerCorrect(q, ans)) {
+                delete wrongCounts[index];
+                delete wrongUserAnswers[index];
+            } else {
+                wrongCounts[index] = (wrongCounts[index] || 0) + 1;
+                wrongUserAnswers[index] = ans;
+            }
         }
         
         function updateLineNums(index, textarea) {

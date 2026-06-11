@@ -308,6 +308,7 @@
             <button class="nav-btn" id="prevBtn" onclick="prevQuestion()" disabled>上一题</button>
             <button class="btn btn-success" onclick="submitAnswers()">提交答案</button>
             <button class="nav-btn" id="nextBtn" onclick="nextQuestion()">下一题</button>
+            <button class="nav-btn" style="border-color:#ef4444;color:#ef4444;" onclick="resetExam()">🔄 重新开始</button>
         </div>
     </div>
 
@@ -1046,7 +1047,8 @@
         let userAnswers = {};
         let showAnswers = false;
         let examSubmitted = false;
-        let wrongSet = new Set();  // 错题本：记录答错的题号索引
+        let wrongCounts = {};    // 错题本：{index: 答错次数}
+        let wrongUserAnswers = {};  // 错题本：记录用户在错题上的选择 {index: userAnswer}
         let currentTab = '全部';   // 当前选中的标签
 
         function init() {
@@ -1134,7 +1136,7 @@
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             event.target.classList.add('active');
             currentTab = '错题本';
-            const filtered = questions.filter((_, i) => wrongSet.has(i));
+            const filtered = questions.filter((_, i) => wrongCounts[i]);
             if (filtered.length > 0) {
                 currentIndex = questions.indexOf(filtered[0]);
             }
@@ -1273,8 +1275,12 @@
             // ---------- 参考答案区域 ----------
             const shouldShowAnswers = showAnswers || hasAnswer;
             let answerSection = '';
-            if (question.type === '程序设计' || question.type === '程序填空' || question.type === '程序改错' || question.type === '填空') {
+            if (!hasAnswer) {
+                // 用户没作答时，不显示任何答案信息
+                answerSection = '';
+            } else if (question.type === '程序设计' || question.type === '程序填空' || question.type === '程序改错' || question.type === '填空') {
                 answerSection = `<div class="answer-section ${shouldShowAnswers ? 'show' : ''}">
+                    ${wrongCounts[index] ? `<div style="margin-bottom:12px;padding:8px 14px;background:#fef2f2;border-left:4px solid #ef4444;border-radius:0 8px 8px 0;font-size:13px;color:#dc2626;">⚠️ 本题已答错 <strong>${wrongCounts[index]}</strong> 次</div>` : ''}
                     <div class="answer-label">参考答案：</div>
                     <div class="answer-content">`;
                 if (question.type === '填空') {
@@ -1308,9 +1314,25 @@
                     ${question.analysis ? `<div class="analysis"><div class="analysis-title">解析：</div>${question.analysis}</div>` : ''}
                 </div>`;
             } else {
-                // 单选
+                // 单选 — 同时显示用户答错的选项和正确答案
                 const rawAnswer = question.answer || '';
-                answerSection = `<div class="answer-section ${shouldShowAnswers ? 'show' : ''}>
+                let userAnswerDisplay = '';
+                const userAns = userAnswers[index];
+                if (userAns && wrongCounts[index]) {
+                    // 找到用户选的选项文字
+                    if (question.options) {
+                        const optIndex = userAns.charCodeAt(0) - 65;
+                        if (optIndex >= 0 && optIndex < question.options.length) {
+                            userAnswerDisplay = question.options[optIndex];
+                        } else {
+                            userAnswerDisplay = userAns;
+                        }
+                    } else {
+                        userAnswerDisplay = userAns;
+                    }
+                }
+                answerSection = `<div class="answer-section ${shouldShowAnswers ? 'show' : ''}">
+                    ${wrongCounts[index] && userAnswerDisplay ? `<div style="margin-bottom:12px;padding:10px 14px;background:#fef2f2;border-left:4px solid #ef4444;border-radius:0 8px 8px 0;font-size:14px;"><div style="margin-bottom:4px;"><strong style="color:#ef4444;">你的答案：</strong><span style="color:#991b1b;margin-left:8px;">${userAnswerDisplay}</span></div><div style="font-size:12px;color:#dc2626;">⚠️ 本题已答错 <strong>${wrongCounts[index]}</strong> 次</div></div>` : ''}
                     <div class="answer-label">参考答案：</div>
                     <div class="answer-content">${rawAnswer}</div>
                     ${question.analysis ? `<div class="analysis"><div class="analysis-title">解析：</div>${question.analysis}</div>` : ''}
@@ -1321,11 +1343,11 @@
             // ---------- 底部按钮 ----------
             if (question.type !== '程序设计') {
                 html += `<div class="btn-group">
-                    ${currentMode === 'practice' && wrongSet.has(index) ? `<button class="btn btn-secondary" style="background:#fef3c7;color:#92400e;" onclick="removeFromWrong(${index})">✓ 移出错题本</button>` : ''}
+                    ${currentMode === 'practice' && wrongCounts[index] ? `<button class="btn btn-secondary" style="background:#fef3c7;color:#92400e;" onclick="removeFromWrong(${index})">✓ 移出错题本</button>` : ''}
                 </div>`;
             } else {
                 // 编程题：在编辑器内部已经有参考答案按钮了，额外追加移出错题本
-                html += wrongSet.has(index) ? `<div style="text-align:right;margin-top:8px;"><button class="btn btn-secondary" style="background:#fef3c7;color:#92400e;font-size:13px;padding:6px 16px;" onclick="removeFromWrong(${index})">✓ 移出错题本</button></div>` : '';
+                html += wrongCounts[index] ? `<div style="text-align:right;margin-top:8px;"><button class="btn btn-secondary" style="background:#fef3c7;color:#92400e;font-size:13px;padding:6px 16px;" onclick="removeFromWrong(${index})">✓ 移出错题本</button></div>` : '';
             }
             html += '</div>';
 
@@ -1339,19 +1361,23 @@
             const ans = userAnswers[index];
             if (ans === undefined) return;
             if (isAnswerCorrect(q, ans)) {
-                wrongSet.delete(index);
+                delete wrongCounts[index];
+                delete wrongUserAnswers[index];
             } else {
-                wrongSet.add(index);
+                wrongCounts[index] = (wrongCounts[index] || 0) + 1;
+                wrongUserAnswers[index] = ans;
             }
             // 更新错题本标签上的数量
+            const wrongCount = Object.keys(wrongCounts).length;
             const wrongBtn = document.getElementById('wrongTabBtn');
-            if (wrongBtn) wrongBtn.textContent = '❌ 错题本' + (wrongSet.size > 0 ? ' (' + wrongSet.size + ')' : '');
+            if (wrongBtn) wrongBtn.textContent = '❌ 错题本' + (wrongCount > 0 ? ' (' + wrongCount + ')' : '');
         }
 
         function clearWrongSet() {
-            if (wrongSet.size === 0) return;
+            if (Object.keys(wrongCounts).length === 0) return;
             if (confirm('确定清除所有错题记录吗？')) {
-                wrongSet.clear();
+                wrongCounts = {};
+                wrongUserAnswers = {};
                 const wrongBtn = document.getElementById('wrongTabBtn');
                 if (wrongBtn) wrongBtn.textContent = '❌ 错题本';
                 updateStats();
@@ -1360,12 +1386,14 @@
         }
 
         function removeFromWrong(index) {
-            wrongSet.delete(index);
+            delete wrongCounts[index];
+            delete wrongUserAnswers[index];
+            const wrongCount = Object.keys(wrongCounts).length;
             const wrongBtn = document.getElementById('wrongTabBtn');
-            if (wrongBtn) wrongBtn.textContent = '❌ 错题本' + (wrongSet.size > 0 ? ' (' + wrongSet.size + ')' : '');
+            if (wrongBtn) wrongBtn.textContent = '❌ 错题本' + (wrongCount > 0 ? ' (' + wrongCount + ')' : '');
             // 如果当前在错题本标签，切换到下一题或返回全部
             if (currentTab === '错题本') {
-                const filtered = questions.filter((_, i) => wrongSet.has(i));
+                const filtered = questions.filter((_, i) => wrongCounts[i]);
                 if (filtered.length > 0) {
                     currentIndex = questions.indexOf(filtered[0]);
                 } else {
@@ -1479,11 +1507,12 @@
             document.getElementById('currentScore').textContent = score;
             
             // 错题本统计
-            document.getElementById('wrongCount').textContent = wrongSet.size;
+            const wrongCount = Object.keys(wrongCounts).length;
+            document.getElementById('wrongCount').textContent = wrongCount;
             const wrongBtn = document.getElementById('wrongTabBtn');
-            if (wrongBtn) wrongBtn.textContent = '❌ 错题本' + (wrongSet.size > 0 ? ' (' + wrongSet.size + ')' : '');
+            if (wrongBtn) wrongBtn.textContent = '❌ 错题本' + (wrongCount > 0 ? ' (' + wrongCount + ')' : '');
             const clearBtn = document.getElementById('clearWrongBtn');
-            if (clearBtn) clearBtn.style.display = wrongSet.size > 0 && currentMode === 'practice' ? 'inline-block' : 'none';
+            if (clearBtn) clearBtn.style.display = wrongCount > 0 && currentMode === 'practice' ? 'inline-block' : 'none';
         }
 
         function submitAnswers() {
@@ -1508,6 +1537,22 @@
         function closeResult() {
             document.getElementById('overlay').classList.remove('show');
             document.getElementById('resultModal').classList.remove('show');
+        }
+
+        // ====== 重新开始 ======
+        function resetExam() {
+            if (!confirm('确定要重新开始吗？当前答题记录将被清除。')) return;
+            userAnswers = {};
+            wrongCounts = {};
+            wrongUserAnswers = {};
+            currentIndex = 0;
+            showAnswers = false;
+            if (typeof stopTimer === 'function') stopTimer();
+            if (typeof closeResult === 'function') closeResult();
+            document.getElementById('overlay').classList.remove('show');
+            document.getElementById('resultModal').classList.remove('show');
+            updateStats();
+            renderQuestion(currentIndex);
         }
 
         init();
