@@ -1,0 +1,10 @@
+*.pdf
+*.elg
+node_modules/
+.DS_Store
+.codegraph/
+.reasonix/
+
+# 考试过程数据目录
+Exam/150000*
+Exam/PY*.elg

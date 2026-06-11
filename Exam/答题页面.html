@@ -1,0 +1,1625 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python考试答题系统</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh; padding: 20px;
+        }
+        .mode-switch { display: flex; gap: 8px; margin-bottom: 20px; justify-content: center; }
+        .mode-btn {
+            padding: 10px 24px; border: 2px solid white; border-radius: 25px;
+            background: transparent; color: white; font-size: 14px; font-weight: 500;
+            cursor: pointer; transition: all 0.3s;
+        }
+        .mode-btn.active { background: white; color: #667eea; }
+        .mode-btn:hover { background: rgba(255,255,255,0.1); }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header {
+            background: white; border-radius: 16px; padding: 24px; margin-bottom: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        }
+        .header h1 { color: #333; font-size: 28px; margin-bottom: 8px; }
+        .header p { color: #666; font-size: 14px; }
+        .stats { display: flex; gap: 20px; margin-top: 16px; flex-wrap: wrap; }
+        .stat-item {
+            background: #f8f9fa; padding: 12px 20px; border-radius: 8px;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .stat-item span:first-child { font-weight: 600; color: #667eea; }
+        .stat-item span:last-child { color: #333; }
+        .timer {
+            background: #f8f9fa; padding: 12px 20px; border-radius: 8px;
+            display: flex; align-items: center; gap: 8px; font-weight: 600; color: #ef4444;
+        }
+        .exam-warning {
+            background: #fffbeb; border-left: 4px solid #f59e0b;
+            padding: 12px 16px; margin-bottom: 20px; border-radius: 0 8px 8px 0;
+            font-size: 14px; color: #78350f;
+        }
+        .tabs { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+        .tab {
+            background: white; border: none; padding: 12px 24px; border-radius: 8px;
+            cursor: pointer; font-size: 14px; font-weight: 500; color: #666;
+            transition: all 0.3s; box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+        .tab:hover { background: #f0f0f0; }
+        .tab.active { background: #667eea; color: white; }
+        .question-card {
+            background: white; border-radius: 16px; padding: 24px; margin-bottom: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1); display: none;
+        }
+        .question-card.active { display: block; }
+        .question-header {
+            display: flex; align-items: center; gap: 12px; margin-bottom: 16px;
+            padding-bottom: 16px; border-bottom: 2px solid #f0f0f0; flex-wrap: wrap;
+        }
+        .question-type {
+            background: #667eea; color: white; padding: 4px 12px; border-radius: 20px;
+            font-size: 12px; font-weight: 500;
+        }
+        .question-type.correct { background: #22c55e; }
+        .question-type.wrong { background: #ef4444; }
+        .question-id { font-size: 14px; color: #999; }
+        .question-score { font-weight: 600; color: #f59e0b; }
+        .question-title {
+            font-size: 16px; font-weight: 600; color: #333; margin-bottom: 16px; line-height: 1.6;
+        }
+        .question-title b { color: #667eea; }
+        .options { display: grid; gap: 12px; }
+        .option {
+            display: flex; align-items: flex-start; gap: 12px; padding: 16px;
+            background: #f8f9fa; border-radius: 12px; cursor: pointer;
+            transition: all 0.3s; border: 2px solid transparent;
+        }
+        .option:hover { background: #f0f0f0; border-color: #e0e0e0; }
+        .option.selected { background: #eef2ff; border-color: #667eea; }
+        .option-letter {
+            width: 32px; height: 32px; background: #667eea; color: white;
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            font-weight: 600; flex-shrink: 0;
+        }
+        .option-content { flex: 1; font-size: 14px; color: #333; line-height: 1.5; }
+        .option.selected .option-letter { background: #667eea; }
+        .option.correct { background: #dcfce7; border-color: #22c55e; }
+        .option.correct .option-letter { background: #22c55e; }
+        .option.wrong { background: #fee2e2; border-color: #ef4444; }
+        .option.wrong .option-letter { background: #ef4444; }
+        .option.disabled { pointer-events: none; opacity: 0.7; }
+        .code-block {
+            background: #1e1e1e; color: #d4d4d4; padding: 16px; border-radius: 8px;
+            font-family: 'Consolas', 'Monaco', monospace; font-size: 13px; line-height: 1.6;
+            overflow-x: auto; margin: 16px 0; white-space: pre-wrap; word-break: break-all;
+        }
+        .answer-section {
+            margin-top: 20px; padding-top: 20px; border-top: 2px solid #f0f0f0; display: none;
+        }
+        .answer-section.show { display: block; }
+        .answer-label { font-weight: 600; color: #667eea; margin-bottom: 8px; display: block; }
+        .answer-content {
+            font-size: 14px; color: #333; line-height: 1.6;
+            background: #f8f9fa; padding: 12px 16px; border-radius: 8px;
+            font-family: 'Consolas', monospace;
+        }
+        .analysis {
+            margin-top: 12px; padding: 12px 16px; background: #fffbeb;
+            border-left: 4px solid #f59e0b; border-radius: 0 8px 8px 0;
+            font-size: 14px; color: #78350f; line-height: 1.6;
+        }
+        .analysis-title { font-weight: 600; margin-bottom: 4px; }
+        .btn-group { display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap; }
+        .btn {
+            padding: 12px 24px; border: none; border-radius: 8px;
+            font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.3s;
+        }
+        .btn-primary { background: #667eea; color: white; }
+        .btn-primary:hover { background: #5a6fd6; }
+        .btn-secondary { background: #f0f0f0; color: #333; }
+        .btn-secondary:hover { background: #e0e0e0; }
+        .btn-success { background: #22c55e; color: white; }
+        .btn-success:hover { background: #16a34a; }
+        .result-modal {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: white; padding: 40px; border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.2); z-index: 1000;
+            text-align: center; max-width: 400px; display: none;
+        }
+        .result-modal.show { display: block; }
+        .result-icon { font-size: 64px; margin-bottom: 20px; }
+        .result-title { font-size: 24px; font-weight: 600; color: #333; margin-bottom: 16px; }
+        .result-score { font-size: 48px; font-weight: 700; color: #667eea; margin-bottom: 8px; }
+        .result-text { color: #666; margin-bottom: 24px; white-space: pre-line; }
+        .overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); z-index: 999; display: none;
+        }
+        .overlay.show { display: block; }
+        .nav-buttons { display: flex; justify-content: space-between; margin-top: 20px; }
+        .nav-btn {
+            padding: 12px 32px; background: white; border: 2px solid #667eea;
+            color: #667eea; border-radius: 8px; cursor: pointer; font-weight: 500;
+            transition: all 0.3s;
+        }
+        .nav-btn:hover { background: #667eea; color: white; }
+        .nav-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .progress-bar { height: 8px; background: #f0f0f0; border-radius: 4px; overflow: hidden; margin-bottom: 16px; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, #667eea, #764ba2); transition: width 0.3s; }
+        .blank-item {
+            background: #fef3c7; padding: 8px 12px; border-radius: 4px;
+            margin-bottom: 8px; font-family: 'Consolas', monospace; font-size: 13px;
+        }
+        .blank-item span:first-child { color: #d97706; font-weight: 600; }
+        .blank-item span:last-child { color: #92400e; margin-left: 8px; }
+        .fix-item {
+            background: #dcfce7; padding: 8px 12px; border-radius: 4px;
+            margin-bottom: 8px; font-family: 'Consolas', monospace; font-size: 13px;
+            border-left: 4px solid #22c55e;
+        }
+        @media (max-width: 768px) {
+            .question-card { padding: 16px; }
+            .header h1 { font-size: 22px; }
+            .option { flex-direction: column; gap: 8px; }
+            .option-letter { align-self: flex-start; }
+        }
+
+        /* ====== 填空题输入框 ====== */
+        .blank-input {
+            border: none; border-bottom: 2.5px solid #667eea;
+            background: #eef2ff; padding: 2px 10px;
+            font-size: 14px; font-family: 'Consolas', 'Monaco', monospace;
+            color: #1e293b; width: 160px; outline: none;
+            transition: all 0.3s; border-radius: 4px 4px 0 0;
+            margin: 0 3px; text-align: center;
+        }
+        .blank-input:focus {
+            border-bottom-color: #764ba2; background: #dbeafe;
+            box-shadow: 0 2px 8px rgba(118,75,162,0.15);
+        }
+        .blank-input.correct { border-bottom-color: #22c55e; background: #dcfce7; }
+        .blank-input.wrong   { border-bottom-color: #ef4444; background: #fee2e2; }
+        .blank-input.code-blank {
+            width: 140px; background: #2d2d2d; color: #d4d4d4;
+            border-bottom-color: #569cd6; font-size: 13px;
+            display: inline-block; vertical-align: middle;
+        }
+        .blank-input.code-blank:focus { background: #383838; border-bottom-color: #4fc1ff; }
+        .blank-input.code-blank.correct { background: #1e3a2e; border-bottom-color: #22c55e; }
+        .blank-input.code-blank.wrong   { background: #3a1e1e; border-bottom-color: #ef4444; }
+
+        /* ====== 代码编辑器（程序设计） ====== */
+        .code-editor {
+            border-radius: 10px; overflow: hidden;
+            border: 1px solid #2d2d2d; margin-top: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+        }
+        .code-editor-header {
+            background: #2d2d2d; padding: 10px 16px;
+            display: flex; align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid #1e1e1e; user-select: none;
+        }
+        .code-lang-label {
+            display: flex; align-items: center; gap: 8px;
+            color: #ccc; font-size: 13px; font-weight: 500;
+        }
+        .code-lang-dot {
+            width: 10px; height: 10px; border-radius: 50%; background: #3572A5;
+        }
+        .code-editor-body {
+            display: flex; background: #1e1e1e; min-height: 340px;
+        }
+        .code-line-nums {
+            padding: 12px 0; background: #1e1e1e;
+            color: #858585; text-align: right; user-select: none;
+            font-family: 'Consolas','Monaco',monospace; font-size: 14px;
+            line-height: 1.6; min-width: 48px;
+            border-right: 1px solid #2d2d2d; overflow: hidden;
+        }
+        .code-line-nums span {
+            display: block; padding: 0 12px 0 0;
+        }
+        .code-textarea {
+            flex: 1; padding: 12px 16px; background: transparent;
+            color: #d4d4d4; border: none; outline: none; resize: vertical;
+            font-family: 'Consolas','Monaco',monospace; font-size: 14px;
+            line-height: 1.6; tab-size: 4; white-space: pre;
+            overflow: auto; min-height: 340px;
+        }
+        .code-editor-footer {
+            background: #252526; padding: 8px 16px;
+            display: flex; gap: 8px;
+            border-top: 1px solid #1e1e1e; justify-content: flex-end;
+        }
+        .btn-code {
+            padding: 6px 16px; border: none; border-radius: 4px;
+            font-size: 13px; font-weight: 500; cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-run { background: #22c55e; color: white; }
+        .btn-run:hover { background: #16a34a; }
+        .btn-ref { background: #4b5563; color: white; }
+        .btn-ref:hover { background: #6b7280; }
+
+        /* ====== 编程题双栏布局 ====== */
+        .coding-split {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 16px;
+        }
+        .coding-problem { min-width: 0; }
+        .coding-editor-panel { min-width: 0; }
+        @media (max-width: 900px) {
+            .coding-split { grid-template-columns: 1fr; }
+        }
+
+        /* ====== 答案标记正确的动画 ====== */
+        .blank-tag {
+            display: inline-block; padding: 0 4px; font-weight: 700;
+            color: #667eea; font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+    <div class="overlay" id="overlay"></div>
+    <div class="result-modal" id="resultModal">
+        <div class="result-icon">🎉</div>
+        <div class="result-title">答题完成!</div>
+        <div class="result-score" id="finalScore">0</div>
+        <div class="result-text" id="resultText"></div>
+        <button class="btn btn-primary" onclick="closeResult()">确定</button>
+    </div>
+
+    <div class="mode-switch">
+        <button class="mode-btn active" onclick="setMode('practice')">📚 练习模式</button>
+        <button class="mode-btn" onclick="setMode('exam')">⏱️ 考试模式</button>
+    </div>
+    
+    <div class="container">
+        <div id="examWarning" class="exam-warning" style="display: none;">
+            ⚠️ <strong>考试模式提醒：</strong>选择后将立即显示答案正误，提交后无法修改，请谨慎作答！
+        </div>
+        
+        <div class="header">
+            <h1>🐍 Python 编程考试答题系统</h1>
+            <p id="modeDesc">📝 练习模式：点击即显示答案，支持填空题输入、编程题在线编写代码</p>
+            <div class="stats">
+                <div class="stat-item"><span>总题数</span><span id="totalQuestions">0</span></div>
+                <div class="stat-item"><span>已答</span><span id="answeredCount">0</span></div>
+                <div class="stat-item"><span>得分</span><span id="currentScore">0</span></div>
+                <div class="stat-item"><span>错题</span><span id="wrongCount" style="color:#ef4444;font-weight:700;">0</span></div>
+                <div class="stat-item"><span>进度</span><span id="progressPercent">0%</span></div>
+                <div class="timer" id="timer" style="display: none;">⏱️ <span id="timeDisplay">30:00</span></div>
+                <button class="btn btn-secondary" id="clearWrongBtn" style="padding:6px 14px;font-size:12px;display:none;" onclick="clearWrongSet()">🗑️ 清除错题</button>
+            </div>
+        </div>
+
+        <div class="tabs" id="tabs"></div>
+        
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressFill"></div>
+        </div>
+
+        <div id="questionContainer"></div>
+
+        <div class="nav-buttons">
+            <button class="nav-btn" id="prevBtn" onclick="prevQuestion()" disabled>上一题</button>
+            <button class="btn btn-success" onclick="submitAnswers()">提交答案</button>
+            <button class="nav-btn" id="nextBtn" onclick="nextQuestion()">下一题</button>
+        </div>
+    </div>
+
+    <script src="exam_data.js"></script>
+    <script>
+        // 异步加载旧JS文件的题库
+        window.legacyQuestions = [];
+        const legacyLoaded = new Promise((resolve) => {
+            const scripts = [
+                '../新建文件夹/yuanbao_javascript_20260611_5inp82.js',
+                '../新建文件夹/yuanbao_javascript_20260611_8jicZf.js',
+                '../新建文件夹/yuanbao_javascript_20260611_HXNSAj.js',
+                '../新建文件夹/yuanbao_javascript_20260611_QSzK8M.js',
+                '../新建文件夹/yuanbao_javascript_20260611_mtR7Ac.js'
+            ];
+            let loaded = 0;
+            scripts.forEach(src => {
+                const script = document.createElement('script');
+                script.src = src;
+                script.onload = () => {
+                    if (typeof questions !== 'undefined') {
+                        window.legacyQuestions.push(...questions);
+                    }
+                    loaded++;
+                    if (loaded === scripts.length) resolve();
+                };
+                script.onerror = () => {
+                    console.warn('加载失败:', src);
+                    loaded++;
+                    if (loaded === scripts.length) resolve();
+                };
+                document.head.appendChild(script);
+            });
+            if (scripts.length === 0) resolve();
+        });
+        
+        let currentMode = 'practice';
+        let timerInterval = null;
+        let remainingTime = 30 * 60;
+        
+        let questions = (function() {
+            if (typeof pythonExamBank === 'undefined') {
+                console.error('题库数据未加载！');
+                return [];
+            }
+            let globalId = 1;
+            const result = [];
+            const seenKeys = new Set();
+            
+            function getQuestionKey(q) {
+                const text = (q.title || q.question || '') + (q.codeTemplate || '');
+                return text.replace(/\s+/g, '').substring(0, 100);
+            }
+            
+            function escapeHtml(text) {
+                if (!text) return '';
+                return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            }
+            
+            function addQuestion(q, type, score) {
+                const key = getQuestionKey(q);
+                if (!seenKeys.has(key)) {
+                    seenKeys.add(key);
+                    if (type === '单选') {
+                        result.push({
+                            type: type, id: globalId++, score: score,
+                            question: q.title || q.question,
+                            options: q.options,
+                            answer: q.answer,
+                            analysis: q.analysis
+                        });
+                    } else if (type === '填空') {
+                        result.push({
+                            type: type, id: globalId++, score: score,
+                            question: q.title || q.question,
+                            answer: Array.isArray(q.answer) ? q.answer : [q.answer],
+                            analysis: q.analysis
+                        });
+                    } else {
+                        const code = q.codeTemplate ? '<div class="code-block">' + escapeHtml(q.codeTemplate) + '</div>' : '';
+                        const titleText = q.title || '';
+                        const analysis = Array.isArray(q.analysis) ? q.analysis.join('<br>') : q.analysis;
+                        result.push({
+                            type: type, id: globalId++, score: score,
+                            title: titleText,
+                            question: titleText + (code ? '<br><br>' + code : ''),
+                            answer: Array.isArray(q.answer) ? q.answer : (q.answer || ''),
+                            analysis: analysis
+                        });
+                    }
+                }
+            }
+            
+            if (pythonExamBank.singleChoice) {
+                pythonExamBank.singleChoice.forEach(q => addQuestion(q, '单选', 2));
+            }
+            if (pythonExamBank.fillBlank) {
+                pythonExamBank.fillBlank.forEach(q => addQuestion(q, '填空', 2));
+            }
+            if (pythonExamBank.programFill) {
+                pythonExamBank.programFill.forEach(q => addQuestion(q, '程序填空', 5));
+            }
+            if (pythonExamBank.programFix) {
+                pythonExamBank.programFix.forEach(q => addQuestion(q, '程序改错', 5));
+            }
+            if (pythonExamBank.programDesign) {
+                pythonExamBank.programDesign.forEach(q => addQuestion(q, '程序设计', 10));
+            }
+            
+            // 等待legacyQuestions加载完成后再处理
+            legacyLoaded.then(() => {
+                if (window.legacyQuestions && window.legacyQuestions.length > 0) {
+                    window.legacyQuestions.forEach(q => {
+                        if (q.type === '单选') addQuestion(q, '单选', q.score || 2);
+                        else if (q.type === '填空') addQuestion(q, '填空', q.score || 2);
+                        else if (q.type === '程序填空') addQuestion(q, '程序填空', q.score || 5);
+                        else if (q.type === '程序改错') addQuestion(q, '程序改错', q.score || 5);
+                        else if (q.type === '程序设计') addQuestion(q, '程序设计', q.score || 10);
+                    });
+                }
+                // 初始化完成后刷新显示
+                init();
+            });
+            
+            console.log('题库加载完成，共 ' + result.length + ' 道题');
+            return result;
+        })();
+        /* _legacyQuestions 已迁移到 exam_data.js
+        const _legacyQuestions = [
+            // ═══════════════════════════════════════════
+            // 第五套题 - 单选题（5题）
+            // ═══════════════════════════════════════════
+            {
+                type: '单选', id: 1, score: 2.0,
+                question: '以下关于文件的描述中，正确的是()。',
+                options: [
+                    'A. 使用 open() 打开文件时，必须要用 r 或 w 指定打开方式，不能省略',
+                    'B. 采用 readlines() 可以读入文件的全部内容，返回一个列表',
+                    'C. 文件打开后，可以用 write() 控制对文件内容的读写位置',
+                    'D. 如果没有采用 close() 关闭文件，Python 程序退出时文件将不会自动关闭'
+                ],
+                answer: 'B',
+                analysis: 'A错误：默认模式为r，可省略；C错误：write()仅写入，seek()控制读写位置；D错误：Python退出时会自动关闭未关闭的文件。'
+            },
+            {
+                type: '单选', id: 2, score: 2.0,
+                question: 'Python 读取文件中一行内容的操作是()。',
+                options: ['A. readtext', 'B. readline', 'C. readall', 'D. read'],
+                answer: 'B',
+                analysis: 'readline()读取单行；read()读取全部；readlines()读取全部并返回列表。'
+            },
+            {
+                type: '单选', id: 3, score: 2.0,
+                question: 'str(int(3.14)) 结果为()。',
+                options: ['A. 3.14', 'B. "3.14"', 'C. "3"', 'D. 3.2'],
+                answer: 'C',
+                analysis: 'int(3.14)=3，str(3)="3"。'
+            },
+            {
+                type: '单选', id: 4, score: 2.0,
+                question: '4 // 3 结果为()。',
+                options: ['A. 1', 'B. 1.33', 'C. 0', 'D. 4'],
+                answer: 'A',
+                analysis: '//为整数除法，4除以3商1余1，取整数部分1。'
+            },
+            {
+                type: '单选', id: 5, score: 2.0,
+                question: '以下关于 Python 缩进的描述中，错误的是()。',
+                options: [
+                    'A. 缩进表达了所属关系和代码块的所属范围',
+                    'B. 缩进是可以嵌套的，从而形成多层缩进',
+                    'C. 判断、循环、函数等都能够通过缩进包含一批代码',
+                    'D. Python 用严格的缩进表示程序的格式框架，所有代码都需要在行前至少加一个空格'
+                ],
+                answer: 'D',
+                analysis: 'D错误：顶级代码无需缩进；缩进量通常为4个空格，但并非强制"至少一个空格"。'
+            },
+            // ═══════════════════════════════════════════
+            // 第三套题 - 单选题（10题）
+            // ═══════════════════════════════════════════
+            {
+                type: '单选', id: 6, score: 2.0,
+                question: '在Python中，使用open()打开Windows操作系统D盘下的一个文件，路径名错误的是()。',
+                options: [
+                    'A. D:\\PythonTest\\a.txt',
+                    'B. D:\\\\PythonTest\\\\a.txt',
+                    'C. D:/PythonTest/a.txt',
+                    'D. D://PythonTest//a.txt'
+                ],
+                answer: 'A',
+                analysis: 'Windows路径需用双反斜杠（\\）或正斜杠（/），单反斜杠会被解析为转义符；D选项使用//不符合路径规范。'
+            },
+            {
+                type: '单选', id: 7, score: 2.0,
+                question: '以下关于Python文件打开模式的描述中，错误的是()。',
+                options: ['A. 只读模式是r', 'B. 覆盖写模式是w', 'C. 追加写模式是a', 'D. 创建写模式是n'],
+                answer: 'D',
+                analysis: 'Python文件创建写模式为x（exclusive），若文件已存在则报错；无n模式。'
+            },
+            {
+                type: '单选', id: 8, score: 2.0,
+                question: '5.0//2.0结果为()。',
+                options: ['A. 2', 'B. 2.5', 'C. 3', 'D. 2.0'],
+                answer: 'D',
+                analysis: '//是整除运算符，返回不大于商的最大整数，5.0//2.0=2.0（保留浮点类型）。'
+            },
+            {
+                type: '单选', id: 9, score: 2.0,
+                question: 'len(\'a\\nb\\\\c\')打印在屏幕上为()。',
+                options: ['A. 4', 'B. 3', 'C. 5', 'D. 7'],
+                answer: 'C',
+                analysis: '字符串包含：a（1）、\\n（换行符，1）、b（1）、\\\\（反斜杠，1）、c（1），共5个字符。'
+            },
+            {
+                type: '单选', id: 10, score: 2.0,
+                question: 'x=0; x=1.5; x=True; x=\'abc\'，则x值为()。',
+                options: ['A. 0', 'B. 1.5', 'C. True', 'D. \'abc\''],
+                answer: 'D',
+                analysis: 'Python变量后赋值覆盖前赋值，最终x被赋值为字符串\'abc\'。'
+            },
+            {
+                type: '单选', id: 11, score: 2.0,
+                question: '下列选项中合法的标识符是()。',
+                options: ['A. _7a_b', 'B. Break', 'C. _a$b', 'D. 7ab'],
+                answer: 'A',
+                analysis: '标识符规则：仅含字母、数字、下划线，不能以数字开头；$非法；Break虽非关键字但非最优解。'
+            },
+            {
+                type: '单选', id: 12, score: 2.0,
+                question: '表达式3*(2+12%3)**3/5的结果是()。',
+                options: ['A. 129.6', 'B. 4', 'C. 43.2', 'D. 4.8'],
+                answer: 'D',
+                analysis: '计算顺序：12%3=0 → 2+0=2 → 2**3=8 → 3*8=24 → 24/5=4.8。'
+            },
+            {
+                type: '单选', id: 13, score: 2.0,
+                question: 'Python语句 print(0xA+0xB)的输出结果是()。',
+                options: ['A. 0xA+0XB', 'B. A+B', 'C. 0xA0xB', 'D. 21'],
+                answer: 'D',
+                analysis: '0xA=10，0xB=11，10+11=21。'
+            },
+            {
+                type: '单选', id: 14, score: 2.0,
+                question: '拟在屏幕上输出Hello World，使用的Python语句是()。',
+                options: [
+                    'A. printf(\' Hello World\')',
+                    'B. print(Hello World)',
+                    'C. print(" Hello World")',
+                    'D. printf(" Hello World")'
+                ],
+                answer: 'C',
+                analysis: 'Python输出函数为print()，字符串需用引号包裹；printf是C语言函数。'
+            },
+            {
+                type: '单选', id: 15, score: 2.0,
+                question: '换行的转义符为()。',
+                options: ['A. \\b', 'B. \\n', 'C. \\t', 'D. \\f'],
+                answer: 'B',
+                analysis: '\\n是换行符；\\b退格，\\t制表符，\\f换页符。'
+            },
+            // ═══════════════════════════════════════════
+            // 第四套题 - 单选题（10题）
+            // ═══════════════════════════════════════════
+            {
+                type: '单选', id: 16, score: 2.0,
+                question: '以下不属于Python文件操作方法的是()。',
+                options: ['A. read()', 'B. write()', 'C. join()', 'D. readline()'],
+                answer: 'C',
+                analysis: 'join()是字符串方法（用于将序列拼接为字符串），不是文件对象的方法。'
+            },
+            {
+                type: '单选', id: 17, score: 2.0,
+                question: '文件a.txt的内容如下：[1,2,3,4]，以下代码的执行结果是()。\nf=open("a.txt","r")\nprint(f.read().split(","))\nf.close()',
+                options: [
+                    'A. "1","2","3","4"',
+                    'B. [1,2,3,4]',
+                    'C. ["[1","2","3","4]"]',
+                    'D. 1,2,3,4'
+                ],
+                answer: 'C',
+                analysis: 'f.read()读取整个文件内容为字符串"[1,2,3,4]"，split(",")按逗号分割后得到["[1", "2", "3", "4]"]。'
+            },
+            {
+                type: '单选', id: 18, score: 2.0,
+                question: '若字符串s="a\\nb\\tc"，则len(s)的值是()。',
+                options: ['A. 7', 'B. 6', 'C. 5', 'D. 4'],
+                answer: 'C',
+                analysis: '转义符\\n（换行）和\\t（制表符）各占1个字符，总长度：a(1)+\\n(1)+b(1)+\\t(1)+c(1)=5。'
+            },
+            {
+                type: '单选', id: 19, score: 2.0,
+                question: '下面()是非法变量名。',
+                options: ['A. my-name', 'B. complex', 'C. _address', 'D. ID'],
+                answer: 'A',
+                analysis: '变量名只能包含字母、数字和下划线，不能包含连字符（-）。'
+            },
+            {
+                type: '单选', id: 20, score: 2.0,
+                question: '以下代码的输出结果是()。\nx=12+3*((5 * 8)-14)//6\nprint(x)',
+                options: ['A. 25.0', 'B. 65', 'C. 25', 'D. 24'],
+                answer: 'D',
+                analysis: '计算步骤：5*8=40 → 40-14=26 → 26//6=4 → 3*4=12 → 12+12=24。'
+            },
+            {
+                type: '单选', id: 21, score: 2.0,
+                question: '下面()不是合法的整数数字。',
+                options: ['A. 0x1e', 'B. 0o27', 'C. 0b1001', 'D. 1e2'],
+                answer: 'D',
+                analysis: '1e2是科学计数法，表示100.0（浮点数）；0x1e（十六进制30）、0o27（八进制23）、0b1001（二进制9）均为整数。'
+            },
+            {
+                type: '单选', id: 22, score: 2.0,
+                question: '以下叙述中正确的是()。',
+                options: [
+                    'A. Python3.x与Python2.x兼容',
+                    'B. Python语句只能以程序方式执行',
+                    'C. Python是解释型语言',
+                    'D. Python语言出现得晚，具有其他高级语言的一切优点'
+                ],
+                answer: 'C',
+                analysis: 'Python是解释型语言；A错误（3.x不兼容2.x）；B错误（支持交互式执行）；D错误（并非"一切优点"）。'
+            },
+            {
+                type: '单选', id: 23, score: 2.0,
+                question: '以下关于Python的描述中，错误的是()。',
+                options: [
+                    'A. 对于需要更高执行速度的功能，如数值计算和动画，Python可以调用C语言编写的底层代码',
+                    'B. Python比大部分编程语言具有更高的软件开发产量和简洁性',
+                    'C. Python是解释执行型语言，因此执行速度比编译型语言慢',
+                    'D. Python是脚本语言，主要用作系统编程和Web开发的开发语言'
+                ],
+                answer: 'D',
+                analysis: 'Python应用领域广泛（数据科学、AI、自动化等），并非"主要用作系统编程和Web开发"。'
+            },
+            {
+                type: '单选', id: 24, score: 2.0,
+                question: '下面运算结果不是浮点型的有()。',
+                options: ['A. 2 * 0.5', 'B. 2**-1', 'C. 5//2', 'D. 18/3'],
+                answer: 'C',
+                analysis: '5//2是整数除法，结果为2（int类型）；A（1.0）、B（0.5）、D（6.0）均为浮点型。'
+            },
+            {
+                type: '单选', id: 25, score: 2.0,
+                question: 'round(2.5)结果为()。',
+                options: ['A. 2', 'B. 2.5', 'C. 3', 'D. 2.0'],
+                answer: 'A',
+                analysis: 'Python的round()函数对.5采用"银行家舍入法"（向最近的偶数舍入），2.5→2。'
+            },
+            // ═══════════════════════════════════════════
+            // 试卷15000059 - 单选题（10题）
+            // ═══════════════════════════════════════════
+            {
+                type: '单选', id: 26, score: 2.0,
+                question: '在读/写文件之前，需要打开文件，使用的函数是()。',
+                options: ['A. read', 'B. fopen', 'C. open', 'D. CFile'],
+                answer: 'C',
+                analysis: 'Python内置函数open()用于打开文件，返回文件对象。fopen是C语言的文件打开函数。'
+            },
+            {
+                type: '单选', id: 27, score: 2.0,
+                question: '以下代码运行后文件book.txt中的内容是()。\nto = open("book.txt", "w")\nls = [\'C语言\', \'Java\', \'C#\', \'Python\']\nto.writelines(ls)\nto.close()',
+                options: [
+                    'A. \'C语言\'"Java"C#"Python\'',
+                    'B. C语言JavaC#Python',
+                    'C. [C语言,Java,C#,Python]',
+                    'D. [\'C语言\',\'Java\',\'C#\',\'Python\']'
+                ],
+                answer: 'B',
+                analysis: 'writelines()直接将每个字符串元素拼接写入，不添加逗号、引号或换行。'
+            },
+            {
+                type: '单选', id: 28, score: 2.0,
+                question: '函数 type(1 + 0xf * 3.14) 的返回结果是()。',
+                options: ['A. <class \'int\'>', 'B. <class \'long\'>', 'C. <class \'str\'>', 'D. <class \'float\'>'],
+                answer: 'D',
+                analysis: '0xf=15（int），15*3.14中有float，结果变为float，1+float仍是float。'
+            },
+            {
+                type: '单选', id: 29, score: 2.0,
+                question: '下列选项中，不属于 Python 特点的是()。',
+                options: ['A. 面向对象', 'B. 运行效率高', 'C. 可读性好', 'D. 开源'],
+                answer: 'B',
+                analysis: 'Python是解释型高级语言，运行效率相对较低（远低于C/C++），这是它的短板。'
+            },
+            {
+                type: '单选', id: 30, score: 2.0,
+                question: 'bool(\'a\') 结果为()。',
+                options: ['A. False', 'B. a', 'C. \'a\'', 'D. True'],
+                answer: 'D',
+                analysis: '非空字符串的布尔值为True，只有空字符串\'\'的bool值为False。'
+            },
+            {
+                type: '单选', id: 31, score: 2.0,
+                question: 'int(3.14) 结果为()。',
+                options: ['A. 3', 'B. 3.14', 'C. 3.1', 'D. 3.2'],
+                answer: 'A',
+                analysis: 'int()截断取整（向零取整），不是四舍五入，int(3.14)=3。'
+            },
+            {
+                type: '单选', id: 32, score: 2.0,
+                question: '以下代码的输出结果是()。\na = 10.99\nprint(complex(a))',
+                options: ['A. 0.99', 'B. 10.99i+j', 'C. 10.99', 'D. (10.99+0j)'],
+                answer: 'D',
+                analysis: 'complex(a)将实数a构造为复数，虚部为0，输出格式为(10.99+0j)。'
+            },
+            {
+                type: '单选', id: 33, score: 2.0,
+                question: 'float(\'1.38\') 结果为()。',
+                options: ['A. 1.38', 'B. \'1.38\'', 'C. 1.4', 'D. 1'],
+                answer: 'A',
+                analysis: 'float(\'1.38\')将数字字符串解析为浮点数1.38，返回值是float类型而非字符串。'
+            },
+            {
+                type: '单选', id: 34, score: 2.0,
+                question: '以下关于语言类型的描述中，正确的是()。',
+                options: [
+                    'A. 静态语言采用解释方式执行，脚本语言采用编译方式执行',
+                    'B. C语言是静态语言，Python是脚本语言',
+                    'C. 编译是将目标代码转换成源代码的过程',
+                    'D. 解释是将源代码一次性转换成目标代码同时逐条运行目标代码的过程'
+                ],
+                answer: 'B',
+                analysis: 'C语言需要先编译再执行（静态编译型）；Python一般解释执行（脚本/动态语言）。'
+            },
+            {
+                type: '单选', id: 35, score: 2.0,
+                question: 'Python 中用来表示代码块所属关系的语法是()。',
+                options: ['A. 花括号 {}', 'B. 圆括号 ()', 'C. 缩进', 'D. 冒号'],
+                answer: 'C',
+                analysis: 'Python用缩进来划分代码块层级，而不是花括号。冒号标志代码块开始，但"所属关系"靠缩进。'
+            },
+            // ═══════════════════════════════════════════
+            // mtR7Ac - 单选题（9题）
+            // ═══════════════════════════════════════════
+            {
+                type: '单选', id: 36, score: 2.0,
+                question: '文件"exam.txt"与以下代码在同一目录下，其内容是一段文本:bigBen。以下代码的输出结果是()。\nf= open("exam.txt")\nprint(f)\nf.close()',
+                options: ['A.bigBen', 'B.exam.txt', 'C.< io. TextIOWrapper...>', 'D.exam'],
+                answer: 'C',
+                analysis: 'open()函数返回的是文件对象，而非文件内容。要读取内容需要使用read()方法。'
+            },
+            {
+                type: '单选', id: 37, score: 2.0,
+                question: '文件"family.txt"在当前代码所在目录内,其内容是一段文本:We are family。以下代码的输出结果是()。\ntxi= open("family.txt","r")\nprint(txt)\ntxt.close()',
+                options: ['A.txt', 'B.family.txt', 'C.其他答案', 'D.We are family'],
+                answer: 'C',
+                analysis: '变量名拼写错误，打开文件赋值给txi，但打印的是未定义的txt变量，会抛出NameError。'
+            },
+            {
+                type: '单选', id: 38, score: 2.0,
+                question: '数学关系表达式-1<x<1,表示成 Python表达式应该是()。',
+                options: ['A.-1<X<1', 'B.-1<x and<1', 'C.-1<x and x>1', 'D.-1<x or x<1'],
+                answer: 'A',
+                analysis: 'Python支持链式比较，-1 < x < 1等价于-1 < x and x < 1。'
+            },
+            {
+                type: '单选', id: 39, score: 2.0,
+                question: '5.0%2.0结果为()。',
+                options: ['A.1.0', 'B.1', 'C.2.5', 'D.2.0'],
+                answer: 'A',
+                analysis: '%是取模运算符，5.0除以2.0商2余1.0，所以结果是1.0。'
+            },
+            {
+                type: '单选', id: 40, score: 2.0,
+                question: 'Python语言属于()。',
+                options: ['A.机器语言', 'B.汇编语言', 'C.高级语言', 'D.科学计算语言'],
+                answer: 'C',
+                analysis: 'Python是高级编程语言，具有可读性强、语法简洁等特点。'
+            },
+            {
+                type: '单选', id: 41, score: 2.0,
+                question: '表达式3**2 * 4//6%7的计算结果是()。',
+                options: ['A.3', 'B.5', 'C.4', 'D.6'],
+                answer: 'D',
+                analysis: '计算步骤：3**2=9 → 9*4=36 → 36//6=6 → 6%7=6。'
+            },
+            {
+                type: '单选', id: 42, score: 2.0,
+                question: '以下关于 Python的描述中,正确的是()。',
+                options: [
+                    'A.条件4<=5<=6是合法的,输出 False',
+                    'B.条件4<=5<=6是不合法的',
+                    'C.条件4<=5<=6是合法的,输出True',
+                    'D.条件4<=5<=6是不合法的，抛出异常'
+                ],
+                answer: 'C',
+                analysis: 'Python支持链式比较，4<=5<=6等价于4<=5 and 5<=6，结果为True。'
+            },
+            {
+                type: '单选', id: 43, score: 2.0,
+                question: '下面运算符优先级最低的是()。',
+                options: ['A.and', 'B.+', 'C.*=', 'D.=='],
+                answer: 'A',
+                analysis: '逻辑运算符and的优先级低于算术运算符和比较运算符。'
+            },
+            {
+                type: '单选', id: 44, score: 2.0,
+                question: '5/2结果为()。',
+                options: ['A.2', 'B.2.5', 'C.3', 'D.2.0'],
+                answer: 'B',
+                analysis: 'Python3中/是浮点除法，5/2=2.5。'
+            },
+            // ═══════════════════════════════════════════
+            // 填空题（10题）
+            // ═══════════════════════════════════════════
+            {
+                type: '填空', id: 45, score: 2.0,
+                question: '列表的count()方法用于统计指定值在列表中的元素个数。已知myList=[\'a\',\'b\',\'b\',\'b\',\'c\',\'c\']，则myList.count(\'b\')的值为[1]，myList.count(\'d\')的值为[2]。',
+                answer: ['3', '0']
+            },
+            {
+                type: '填空', id: 46, score: 2.0,
+                question: '假设arr=np.array([[1,2,3],[4,5,6],[7,8,9]])，运行下列代码，填写输出结果：\n>>> print(arr[1, 1])\n[1]\n>>> print(arr[:, 1])\n[2]\n>>> print(arr[0:2, 0:2])\n[3]',
+                answer: ['5', '[2, 5, 8]', '[[1, 2], [4, 5]]']
+            },
+            {
+                type: '填空', id: 47, score: 2.0,
+                question: '在使用pyplot模块时，一般采用如下方式导入matplotlib中的pyplot模块：[1]',
+                answer: ['import matplotlib.pyplot as plt']
+            },
+            {
+                type: '填空', id: 48, score: 2.0,
+                question: 'Series对象最重要的一个功能就是[1]，即多个Series对象中的数据按索引进行匹配运算，运算结果常包含NaN。',
+                answer: ['索引对齐（或对齐）']
+            },
+            {
+                type: '填空', id: 49, score: 2.0,
+                question: '数值列表可使用Python提供的内置函数进行简单统计。求和可使用sum()函数，计算最大值可使用max()函数，计算最小值可使用min()函数。假设已有列表a=[1,2,3,4,5]，则表达式sum(a)的值为[1]，表达式max(a)的值为[2]，表达式min(a)的值为[3]。',
+                answer: ['15', '5', '1']
+            },
+            {
+                type: '填空', id: 50, score: 2.0,
+                question: '字典中的键一旦增加就[1]（能/不能）修改，只能[2]。',
+                answer: ['不能', '删除后重新添加']
+            },
+            {
+                type: '填空', id: 51, score: 2.0,
+                question: '列表与字符串一样，也支持"+"和"*"两种运算，结果为一个新的列表。假设已有列表myList=["a","b","c"]，则myList*3的结果为[1]，myList+["d","e"]的结果为[2]。这两种运算均[3]（改变/不改变）列表本身。如需将列表["d","e"]中的所有元素一次性添加至列表myList中，可使用列表的[4]方法。',
+                answer: ['["a","b","c","a","b","c","a","b","c"]', '["a","b","c","d","e"]', '不改变', 'extend']
+            },
+            {
+                type: '填空', id: 52, score: 2.0,
+                question: '由于Series对象的索引和值有着一一对应的关系，且索引和值经常一起出现，这个特点和字典非常像，所以在创建Series对象时，经常利用[1]来创建Series对象，但需清楚：字典是[2]（无序/有序）的，而Series对象是[3]（无序/有序）的。',
+                answer: ['字典', '无序', '有序']
+            },
+            {
+                type: '填空', id: 53, score: 2.0,
+                question: 'pyplot模块中提供了很多绘制不同种类图形的函数。例如，[1]函数可以绘制箱形图，[2]函数可以绘制条形图，[3]函数可以绘制直方图，[4]函数可以绘制饼图，[5]函数可以绘制极坐标图，[6]函数可以绘制散点图。',
+                answer: ['boxplot', 'bar', 'hist', 'pie', 'polar', 'scatter']
+            },
+            {
+                type: '填空', id: 54, score: 2.0,
+                question: '在字典中修改指定键所对应的值或者新增键值对,都可以通过表达式____完成。',
+                answer: ['字典名[键]=值']
+            },
+            // ═══════════════════════════════════════════
+            // 程序填空题（8题）
+            // ═══════════════════════════════════════════
+            {
+                type: '程序填空', id: 55, score: 5.0,
+                title: '等差数列生成',
+                question: '获得用户输入的以英文逗号分隔的三个数字，记为a、b、c，以a为起始数值，b为差，c为数值的数量，产生一个递增的等差数列，以列表格式输出。\n示例输入：15,3,3 → 输出：[15, 18, 21]\n\n<code>a, b, c = ??\nls = []\nfor i in range(c):\n    ls.??\nprint(ls)</code>',
+                answer: ['eval(input())', 'append(a + b * i)'],
+                analysis: '第一空使用eval(input())接收逗号分隔的输入并转为元组；第二空计算等差项a + b * i并添加到列表。'
+            },
+            {
+                type: '程序填空', id: 56, score: 5.0,
+                title: '字符串逆序与长度输出',
+                question: '获得用户输入的一个字符串，将字符串逆序输出，同时紧接着输出字符串的个数。\n\n<code>s = input()\nprint(??, end="")\nprint(??)</code>',
+                answer: ['s[::-1]', 'len(s)'],
+                analysis: '第一空使用切片s[::-1]实现字符串逆序；第二空使用len(s)输出字符串长度。'
+            },
+            {
+                type: '程序填空', id: 57, score: 5.0,
+                title: '单词居中输出',
+                question: '获得用户输入的一个长度小于20的英文单词，以20字符宽居中输出，第一行输出20个"="，第二行左右两边输出"|"，单词居中，其他位置用"*"填充。\n示例：输入python → 输出：\n====================\n|******python******|\n\n<code>f = input("请输入一个单词:")\nprint("{}".format(??))\nprint("??".format(f))</code>',
+                answer: ['\'=\'*20', '|{:*^18}|'],
+                analysis: '第一空生成20个等号；第二空使用格式符实现居中对齐，宽度18，两侧用*填充。'
+            },
+            {
+                type: '程序填空', id: 58, score: 5.0,
+                title: '随机选品牌',
+                question: '随机选择一个手机品牌的名字。\n\n<code>import ??\nbrandlist = ["华为","苹果","vivo","OPPO","小米"]\nrandom.seed(0)\n??\nprint(name)</code>',
+                answer: ['random', 'name = brandlist[random.randint(0,4)]'],
+                analysis: '第一空导入random模块；第二空随机选择品牌列表中的一个元素。'
+            },
+            {
+                type: '程序填空', id: 59, score: 5.0,
+                title: '列表追加与循环边界',
+                question: '按"答题"按钮进入程序环境调试，在 **********SPACE********** 处填空。',
+                answer: ['10', 'append(n)'],
+                analysis: '第一空循环范围到10；第二空使用append方法添加元素到列表。'
+            },
+            {
+                type: '程序填空', id: 60, score: 5.0,
+                title: '字符串类型判断',
+                question: '用户按照列表格式输入数据，将用户输入的列表中属于字符串类型的元素连接成一个整字符串，并打印输出。\n样例：[123,"Python",98,"等级考试"] → Python等级考试\n\n<code>ls= eval(input())\ns=""\nfor item in ls:\n#**********SPACE**********\nif [?] == type("香山"):\n#**********SPACE**********\ns += [?]\nprint(s)</code>',
+                answer: ['type(item)', 'item'],
+                analysis: '第一空判断元素类型是否为字符串；第二空将字符串元素拼接。'
+            },
+            {
+                type: '程序填空', id: 61, score: 5.0,
+                title: '列表推导式',
+                question: '用列表推导式生成100以内偶数的平方根。\n\n<code>#**********SPACE**********\nimport [?]\n#**********SPACE**********\nls=[ math.sqrt(x) for x in range(100) if [?] ]\nprint(ls)</code>',
+                answer: ['math', 'x%2==0'],
+                analysis: '第一空导入math模块；第二空判断x是否为偶数。'
+            },
+            {
+                type: '程序填空', id: 62, score: 5.0,
+                title: '因子函数',
+                question: '定义因子函数，求整数的所有因子列表，用户输入一个整数，输出因子列表；输入非法字符则输出"输入错误!"。\n\n<code>def allFactor(n):\n    if n<=1:\n        return[n]\n    if n<=3:\n        return[1,n]\n    i=1\n    #**********SPACE**********\n    [?]\n    while i<= n:\n        if n% i== 0:\n            rlist.append(i)\n        #***********SPACE**********\n        [?]\n    return rlist</code>',
+                answer: ['rlist=[]', 'i+=1'],
+                analysis: '第一空初始化列表；第二空递增i。'
+            },
+            // ═══════════════════════════════════════════
+            // 程序改错题（8题）
+            // ═══════════════════════════════════════════
+            {
+                type: '程序改错', id: 63, score: 5.0,
+                title: '奇偶数列求和',
+                question: '当输入n为偶数时，求1/2+1/4+...+1/n；当输入n为奇数时，求1/1+1/3+...+1/n。\n\n<code>def peven(n):\n    s = 0\n    for i in range(2, n+1):  # 错误1\n        s += 1/i\n    return s\n\ndef podd(n):\n    s = 0\n    for i in range(1, n+1, 2):\n        s += 1/i\n    return s\n\ndef dcall(fp, n):\n    s = peven(n)  # 错误2\n    return s</code>',
+                answer: ['for i in range(2, n+1, 2):', 's = fp(n)'],
+                analysis: '错误1：peven函数缺少步长2，应只遍历偶数；错误2：dcall函数应调用传入的函数指针fp而非固定调用peven。'
+            },
+            {
+                type: '程序改错', id: 64, score: 5.0,
+                title: '公式计算',
+                question: '根据整型形参m的值，计算1 - 1/(2×2) - 1/(3×3) - ... - 1/(m×m)。\n示例：m=5时，结果应为0.536389\n\n<code>def fun(m):\n    y = 1.0\n    for i in range(2, m)  # 错误1\n        y -= 1.0/i  # 错误2\n    return y\n\ndef main():\n    m = int(input("请输入参数m的值："))\n    print("结果为:%.6f", fun(m))  # 错误3</code>',
+                answer: ['for i in range(2, m+1):', 'y -= 1.0/(i*i)', 'print("结果为:%.6f" % fun(m))'],
+                analysis: '错误1：range终点需包含m；错误2：分母应为i的平方；错误3：格式化输出符号应为%。'
+            },
+            {
+                type: '程序改错', id: 65, score: 5.0,
+                title: '折半查找',
+                question: '在有序数组中折半查找整数m，找到返回下标，否则返回-1。\n\n<code>def fun(a, m):\n    low = 0\n    high = len(a) - 1\n    while(low <= high):\n        mid = (low + high) / 2  # 错误1\n        if(m < a[mid]):\n            high = mid - 1\n        else if(m < a[mid])  # 错误2\n            low = mid + 1\n        else:\n            return mid\n    return -1</code>',
+                answer: ['mid = (low + high) // 2', 'elif m > a[mid]:'],
+                analysis: '错误1：索引必须为整数，用//整除；错误2：Python无else if，应为elif。'
+            },
+            {
+                type: '程序改错', id: 66, score: 5.0,
+                title: '年龄递推',
+                question: '第5个人比第4个人大2岁，第4个人比第3个人大2岁……第1个人10岁，求第5个人的年龄。\n\n<code>def age(n):\n    if n = 1:  # 错误1\n        c = 10\n    else:\n        c = age(n) + 2  # 错误2\n    return c\n\ndef main():\n    print(age())  # 错误3</code>',
+                answer: ['if n == 1:', 'c = age(n-1) + 2', 'print(age(5))'],
+                analysis: '错误1：赋值运算符误用为比较运算符；错误2：应调用n-1岁的年龄再加2；错误3：需传入参数5。'
+            },
+            {
+                type: '程序改错', id: 67, score: 5.0,
+                title: '函数定义与调用修正',
+                question: '修正斐波那契数列计算逻辑。\n\n<code>#**********FOUND**********\nif step==1 && step==2:\n#**********FOUND**********\nfor i in range(3, step):</code>',
+                answer: ['if step==1 or step==2:', 'for i in range(3, step+1):'],
+                analysis: '错误1：Python无&&，应为or；错误2：range终点需包含step。'
+            },
+            {
+                type: '程序改错', id: 68, score: 5.0,
+                title: '分段函数修正',
+                question: '修正分段函数计算逻辑。\n\n<code>#***********FOUND**********\nif(x<0 || x!=-3.0):\n#***********FOUND**********\nelif(x>=0 && x<10.0 && x!=2.0 || x!=3.0):\n#***********FOUND**********\nreturn x</code>',
+                answer: ['if(x<0 and x!=-3.0):', 'elif(x>=0 and x<10.0 and x!=2.0 and x!=3.0):', 'return y'],
+                analysis: '错误1：Python无||，应为and；错误2：逻辑运算符修正；错误3：应返回y而非x。'
+            },
+            {
+                type: '程序改错', id: 69, score: 5.0,
+                title: '完数判断修正',
+                question: '修正完数判断函数。\n\n<code>def fun(n):\n    #***********FOUND**********\n    s=[]\n    for i in range(1,n):\n        if n%i==0:\n            s+=i\n    if n==s:\n        #***********FOUND**********\n        return 0\n    else:\n        return False</code>',
+                answer: ['s=0', 'return True'],
+                analysis: '错误1：s应初始化为0而非列表；错误2：完数判断应返回True。'
+            },
+            {
+                type: '程序改错', id: 70, score: 5.0,
+                title: '最大10个能被13或17整除的数之和',
+                question: '计算并输出k以内最大的10个能被13或17整除的自然数之和。\n\n<code>def fun(k):\n    m=0\n    mc=0\n    #**********FOUND**********\n    while((k>=2)&&(mc<10)):\n    #***********FOUND**********\n    if((k%13==0)||(k%17==0)):\n        m=m+k\n        mc+=1\n    #***********FOUND**********\n    k++\n    return m</code>',
+                answer: ['while((k>=2)and(mc<10)):', 'if((k%13==0)or(k%17==0)):', 'k-=1'],
+                analysis: '错误1：Python无&&，应为and；错误2：Python无||，应为or；错误3：Python无++，应为k-=1。'
+            },
+            // ═══════════════════════════════════════════
+            // 程序设计题（8题）
+            // ═══════════════════════════════════════════
+            {
+                type: '程序设计', id: 71, score: 10.0,
+                title: '倒三角形图案',
+                question: '使用for循环输出倒三角形（4行，从上到下星号数：7、5、3、1）。\n输出示例：\n*******\n *****\n  ***\n   *',
+                answer: 'for i in range(1,5):\n    for j in range(4-i):\n        print(" ", end="")\n    for j in range(1, 2*i):\n        print("*", end="")\n    print()',
+                analysis: '外层循环控制行数，内层两个循环分别输出空格和星号。'
+            },
+            {
+                type: '程序设计', id: 72, score: 10.0,
+                title: '正三角形图案',
+                question: '使用for循环输出正三角形（5行，从上到下星号数：1、3、5、7、9）。\n输出示例：\n    *\n   ***\n  *****\n *******\n*********',
+                answer: 'for i in range(1,6):\n    for j in range(5-i):\n        print(" ", end="")\n    for j in range(2*i-1):\n        print("*", end="")\n    print()',
+                analysis: '外层循环控制行数，内层两个循环分别输出空格和星号。'
+            },
+            {
+                type: '程序设计', id: 73, score: 10.0,
+                title: '1-10的平方列表',
+                question: '将1-10的平方依次添加到列表，并分阶段输出列表。\n输出示例：\n[1]\n[1, 4]\n[1, 4, 9]\n...\n[1, 4, 9, 16, 25, 36, 49, 64, 81, 100]',
+                answer: 'squares = []\nfor x in range(1, 11):\n    squares.append(x**2)\n    print(squares)',
+                analysis: '遍历1到10，计算每个数的平方并添加到列表，每次添加后打印列表。'
+            },
+            {
+                type: '程序设计', id: 74, score: 10.0,
+                title: '九九乘法表',
+                question: '打印1×1 ~ 9×9的完整乘法表，每行从j=1到j=9。',
+                answer: 'for i in range(1, 10):\n    for j in range(1, 10):\n        print(\'%s*%s=%2s\' % (i, j, i*j), end=\'  \')\n    print()',
+                analysis: '使用双重for循环，外层控制行数，内层控制每行的乘法项。'
+            },
+            {
+                type: '程序设计', id: 75, score: 10.0,
+                title: '斐波那契数列（递归）',
+                question: '在Program ~ End范围内补全斐波那契函数：f(1)=f(2)=1，其余f(n)=f(n-1)+f(n-2)。',
+                answer: 'def Fibonacci(i):\n    if i == 1 or i == 2:\n        return 1\n    else:\n        return Fibonacci(i-1) + Fibonacci(i-2)',
+                analysis: '使用递归算法计算斐波那契数列，当i为1或2时返回1，否则返回前两项之和。'
+            },
+            {
+                type: '程序设计', id: 76, score: 10.0,
+                title: '三位数排列',
+                question: '用1、2、3三个数字组成所有互不相同且无重复数字的三位数，并输出。',
+                answer: 'for i in [1,2,3]:\n    for j in [1,2,3]:\n        for k in [1,2,3]:\n            if i!=j and j!=k and i!=k:\n                print(i*100 + j*10 + k)',
+                analysis: '使用三重循环遍历所有组合，通过条件判断确保每位数字互不相同。'
+            },
+            {
+                type: '程序设计', id: 77, score: 10.0,
+                title: '斐波那契数列前20项',
+                question: '编写程序输出斐波那契数列的前20项，要求每行输出5项。',
+                answer: 'x1=1\nx2=1\ncount=2\nprint("{:>8}{:>8}".format(x1,x2), end="")\nfor i in range(3, 21):\n    x3=x1+x2\n    print("{:>8}".format(x3), end="")\n    count+=1\n    if count%5==0: print()\n    x1=x2\n    x2=x3',
+                analysis: '使用迭代方式计算斐波那契数列，每5项换行。'
+            },
+            {
+                type: '程序设计', id: 78, score: 10.0,
+                title: '表达式求和',
+                question: '计算表达式 sum=a+aa+aaaa+...+aaa..aaaa 的值（a为1-9自然数，n为项数）。\n示例：a=2,n=4 → sum=2+22+222+2222=2468',
+                answer: 'def fun(a,n):\n    result,ts=0,0\n    for i in range(n):\n        ts=ts*10+a\n        result+=ts\n    return result',
+                analysis: '使用迭代方式生成每一项（如2→22→222），并累加求和。'
+            }
+        ]; */
+
+        let currentIndex = 0;
+        let userAnswers = {};
+        let showAnswers = false;
+        let examSubmitted = false;
+        let wrongSet = new Set();  // 错题本：记录答错的题号索引
+        let currentTab = '全部';   // 当前选中的标签
+
+        function init() {
+            renderTabs();
+            renderQuestion(currentIndex);
+            updateStats();
+        }
+
+        function setMode(mode) {
+            currentMode = mode;
+            examSubmitted = false;
+            document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            if (mode === 'practice') {
+                document.getElementById('modeDesc').textContent = '📝 练习模式：点击即显示答案，支持填空题输入、编程题在线编写代码';
+                document.getElementById('examWarning').style.display = 'none';
+                document.getElementById('timer').style.display = 'none';
+                stopTimer();
+                remainingTime = 30 * 60;
+                showAnswers = false;
+            } else {
+                document.getElementById('modeDesc').textContent = '⏱️ 考试模式：30分钟限时，选择后立即显示正误，提交后无法修改';
+                document.getElementById('examWarning').style.display = 'block';
+                document.getElementById('timer').style.display = 'flex';
+                userAnswers = {};
+                showAnswers = false;
+                startTimer();
+            }
+            updateStats();
+            renderQuestion(currentIndex);
+        }
+
+        function startTimer() {
+            stopTimer();
+            updateTimerDisplay();
+            timerInterval = setInterval(() => {
+                remainingTime--;
+                updateTimerDisplay();
+                if (remainingTime <= 0) submitAnswers();
+            }, 1000);
+        }
+
+        function stopTimer() {
+            if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+        }
+
+        function updateTimerDisplay() {
+            const minutes = Math.floor(remainingTime / 60);
+            const seconds = remainingTime % 60;
+            document.getElementById('timeDisplay').textContent = `${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}`;
+        }
+
+        function renderTabs() {
+            const tabs = document.getElementById('tabs');
+            const types = ['全部', ...new Set(questions.map(q => q.type))];
+            tabs.innerHTML = '';
+            types.forEach(type => {
+                const btn = document.createElement('button');
+                btn.className = (type === currentTab || (type === '全部' && currentTab === '全部')) ? 'tab active' : 'tab';
+                btn.textContent = type;
+                btn.onclick = () => filterByType(type);
+                tabs.appendChild(btn);
+            });
+            // 错题本标签
+            const wrongBtn = document.createElement('button');
+            wrongBtn.className = currentTab === '错题本' ? 'tab active' : 'tab';
+            wrongBtn.id = 'wrongTabBtn';
+            wrongBtn.textContent = '❌ 错题本';
+            wrongBtn.onclick = () => filterWrong();
+            tabs.appendChild(wrongBtn);
+        }
+
+        function filterByType(type) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            currentTab = type;
+            const filtered = type === '全部' ? questions : questions.filter(q => q.type === type);
+            if (filtered.length > 0) {
+                currentIndex = questions.indexOf(filtered[0]);
+                renderQuestion(currentIndex);
+            }
+        }
+
+        function filterWrong() {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            currentTab = '错题本';
+            const filtered = questions.filter((_, i) => wrongSet.has(i));
+            if (filtered.length > 0) {
+                currentIndex = questions.indexOf(filtered[0]);
+            }
+            renderQuestion(currentIndex);
+            updateStats();
+        }
+
+        function renderQuestion(index) {
+            const container = document.getElementById('questionContainer');
+            const question = questions[index];
+            const hasAnswer = userAnswers[index] !== undefined;
+            const isCorrect = hasAnswer && isAnswerCorrect(question, userAnswers[index]);
+            const showFeedback = hasAnswer && (currentMode === 'exam' || currentMode === 'practice');
+            
+            // ---------- 构建题干文本（处理填空输入框 / 编程题代码块输入框） ----------
+            let qText = question.question;
+            
+            // 填空：将 [1][2]...、【1】【2】... 或 ____ 替换为输入框
+            if (question.type === '填空') {
+                const userBlanks = Array.isArray(userAnswers[index]) ? userAnswers[index] : [];
+                const hasNumbered = /\[\d+\]/.test(qText) || /【\d+】/.test(qText);
+                if (hasNumbered) {
+                    // [1], [2]... 或 【1】【2】... 编号空白
+                    qText = qText.replace(/\[(\d+)\]|【(\d+)】/g, (match, num1, num2) => {
+                        const bi = parseInt(num1 || num2) - 1;
+                        const val = userBlanks[bi] || '';
+                        let cls = '';
+                        if (showFeedback) {
+                            const correctAns = Array.isArray(question.answer) ? question.answer[bi] : '';
+                            cls = String(val).trim().toLowerCase() === String(correctAns || '').trim().toLowerCase() ? 'correct' : 'wrong';
+                        }
+                        return `<input class="blank-input ${cls}" type="text" value="${val.replace(/"/g,'&quot;')}" onchange="saveBlankAnswer(${index},${bi},this.value)" placeholder="?" ${currentMode === 'exam' && showFeedback ? 'disabled' : ''}>`;
+                    });
+                } else {
+                    // ____ 顺序空白
+                    let seqIdx = 0;
+                    qText = qText.replace(/_{2,}/g, () => {
+                        const bi = seqIdx++;
+                        const val = userBlanks[bi] || '';
+                        let cls = '';
+                        if (showFeedback) {
+                            const correctAns = Array.isArray(question.answer) ? question.answer[bi] : '';
+                            cls = String(val).trim().toLowerCase() === String(correctAns || '').trim().toLowerCase() ? 'correct' : 'wrong';
+                        }
+                        return `<input class="blank-input ${cls}" type="text" value="${val.replace(/"/g,'&quot;')}" onchange="saveBlankAnswer(${index},${bi},this.value)" placeholder="?" ${currentMode === 'exam' && showFeedback ? 'disabled' : ''}>`;
+                    });
+                }
+            }
+            
+            // 程序填空/程序改错：将 <code> 块中的 ?? / [?] / 【?】替换为输入框
+            let displayText = qText;
+            if (question.type === '程序填空' || question.type === '程序改错') {
+                const userBlanks = Array.isArray(userAnswers[index]) ? userAnswers[index] : [];
+                let bkIdx = 0;
+                displayText = qText.replace(/<code>([\s\S]*?)<\/code>/g, (match, codeContent) => {
+                    let modifiedCode = codeContent.replace(/\?\?|\[\?\]|【\?】|【(\d+)】/g, (m, num) => {
+                        const idx = num ? parseInt(num) - 1 : bkIdx++;
+                        const val = userBlanks[idx] || '';
+                        let cls = 'code-blank';
+                        if (showFeedback) {
+                            const correctAns = Array.isArray(question.answer) ? question.answer[idx] : '';
+                            cls += String(val).trim().toLowerCase() === String(correctAns || '').trim().toLowerCase() ? ' correct' : ' wrong';
+                        }
+                        return `<input class="blank-input ${cls}" type="text" value="${val.replace(/"/g,'&quot;')}" onchange="saveBlankAnswer(${index},${idx},this.value)" placeholder="?" ${currentMode === 'exam' && showFeedback ? 'disabled' : ''}>`;
+                    });
+                    return `<div class="code-block">${modifiedCode}</div>`;
+                });
+            }
+            
+            // 将代码标记和换行转为 HTML（注意：此时 displayText 中已无 <code> 标签）
+            const titleHtml = (question.title ? `<b>${question.title}</b><br><br>` : '') + displayText.replace(/\n/g, '<br>');
+            
+            let html = `<div class="question-card active">
+                <div class="question-header">
+                    <span class="question-type">${question.type}</span>
+                    <span class="question-id">第 ${index + 1} 题</span>
+                    <span class="question-score">${question.score} 分</span>
+                    ${showFeedback ? `<span class="question-type ${isCorrect ? 'correct' : 'wrong'}">${isCorrect ? '✓ 正确' : '✗ 错误'}</span>` : ''}
+                </div>
+                <div class="question-title">${titleHtml}</div>`;
+
+            // ---------- 单选题选项 ----------
+            if (question.options) {
+                html += '<div class="options">';
+                question.options.forEach((option, i) => {
+                    const letter = String.fromCharCode(65 + i);
+                    const isSelected = userAnswers[index] === letter;
+                    let optionClass = '';
+                    if (showFeedback) {
+                        if (letter === question.answer) optionClass = 'correct';
+                        else if (isSelected && letter !== question.answer) optionClass = 'wrong';
+                        if (currentMode === 'exam') optionClass += ' disabled';
+                    } else if (isSelected) optionClass = 'selected';
+                    html += `<div class="option ${optionClass}" onclick="selectOption(${index}, '${letter}')">
+                        <span class="option-letter">${letter}</span>
+                        <span class="option-content">${option}</span>
+                    </div>`;
+                });
+                html += '</div>';
+            }
+
+            // ---------- 程序设计：双栏布局（题目 + 代码编辑器） ----------
+            if (question.type === '程序设计') {
+                const savedCode = (userAnswers[index] || '') + '';
+                const codeLines = savedCode.split('\n').length || 1;
+                let lineNumsHtml = '';
+                for (let i = 1; i <= codeLines; i++) lineNumsHtml += `<span>${i}</span>`;
+                html = `<div class="question-card active">
+                    <div class="question-header">
+                        <span class="question-type">${question.type}</span>
+                        <span class="question-id">第 ${index + 1} 题</span>
+                        <span class="question-score">${question.score} 分</span>
+                        ${showFeedback ? `<span class="question-type ${isCorrect ? 'correct' : 'wrong'}">${isCorrect ? '✓ 正确' : '✗ 错误'}</span>` : ''}
+                    </div>
+                    <div class="coding-split">
+                        <div class="coding-problem">
+                            <div class="question-title">${titleHtml}</div>
+                        </div>
+                        <div class="coding-editor-panel">
+                            <div class="code-editor">
+                                <div class="code-editor-header">
+                                    <span class="code-lang-label"><span class="code-lang-dot"></span> Python</span>
+                                    ${currentMode === 'practice' ? `<button class="btn-code btn-ref" onclick="toggleAnswer(${index})">${showAnswers ? '隐藏答案' : '参考答案'}</button>` : ''}
+                                </div>
+                                <div class="code-editor-body">
+                                    <div class="code-line-nums" id="lineNums_${index}">${lineNumsHtml}</div>
+                                    <textarea class="code-textarea" id="codeArea_${index}" spellcheck="false" ${currentMode === 'exam' && showFeedback ? 'disabled' : ''} oninput="saveCodeAnswer(${index},this);updateLineNums(${index},this)">${savedCode}</textarea>
+                                </div>
+                                <div class="code-editor-footer">
+                                    <span style="color:#858585;font-size:12px;flex:1;align-self:center;">💡 编写代码后与参考答案对比学习</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>`;
+            }
+
+            // ---------- 参考答案区域 ----------
+            const shouldShowAnswers = showAnswers || hasAnswer;
+            let answerSection = '';
+            if (question.type === '程序设计' || question.type === '程序填空' || question.type === '程序改错' || question.type === '填空') {
+                answerSection = `<div class="answer-section ${shouldShowAnswers ? 'show' : ''}">
+                    <div class="answer-label">参考答案：</div>
+                    <div class="answer-content">`;
+                if (question.type === '填空') {
+                    if (Array.isArray(question.answer)) {
+                        question.answer.forEach((ans, i) => {
+                            answerSection += `<div class="blank-item"><span>[${i + 1}]</span><span>${ans}</span></div>`;
+                        });
+                    } else {
+                        answerSection += question.answer;
+                    }
+                } else if (question.type === '程序填空') {
+                    if (Array.isArray(question.answer)) {
+                        question.answer.forEach((ans, i) => {
+                            answerSection += `<div class="blank-item"><span>[${i + 1}]</span><span>${ans}</span></div>`;
+                        });
+                    } else {
+                        answerSection += question.answer;
+                    }
+                } else if (question.type === '程序改错') {
+                    if (Array.isArray(question.answer)) {
+                        question.answer.forEach((ans, i) => {
+                            answerSection += `<div class="fix-item">修正${i + 1}: ${ans}</div>`;
+                        });
+                    } else {
+                        answerSection += question.answer;
+                    }
+                } else if (question.type === '程序设计') {
+                    answerSection += `<pre style="white-space: pre-wrap;background:#1e1e1e;color:#d4d4d4;padding:16px;border-radius:8px;font-size:14px;">${question.answer}</pre>`;
+                }
+                answerSection += `</div>
+                    ${question.analysis ? `<div class="analysis"><div class="analysis-title">解析：</div>${question.analysis}</div>` : ''}
+                </div>`;
+            } else {
+                // 单选
+                const rawAnswer = question.answer || '';
+                answerSection = `<div class="answer-section ${shouldShowAnswers ? 'show' : ''}>
+                    <div class="answer-label">参考答案：</div>
+                    <div class="answer-content">${rawAnswer}</div>
+                    ${question.analysis ? `<div class="analysis"><div class="analysis-title">解析：</div>${question.analysis}</div>` : ''}
+                </div>`;
+            }
+            html += answerSection;
+
+            // ---------- 底部按钮 ----------
+            if (question.type !== '程序设计') {
+                html += `<div class="btn-group">
+                    ${currentMode === 'practice' ? `<button class="btn btn-secondary" onclick="toggleAnswer(${index})">${showAnswers ? '隐藏答案' : '查看答案'}</button>` : ''}
+                    ${currentMode === 'practice' && wrongSet.has(index) ? `<button class="btn btn-secondary" style="background:#fef3c7;color:#92400e;" onclick="removeFromWrong(${index})">✓ 移出错题本</button>` : ''}
+                </div>`;
+            } else {
+                // 编程题：在编辑器内部已经有参考答案按钮了，额外追加移出错题本
+                html += wrongSet.has(index) ? `<div style="text-align:right;margin-top:8px;"><button class="btn btn-secondary" style="background:#fef3c7;color:#92400e;font-size:13px;padding:6px 16px;" onclick="removeFromWrong(${index})">✓ 移出错题本</button></div>` : '';
+            }
+            html += '</div>';
+
+            container.innerHTML = html;
+            updateNavButtons();
+        }
+
+        // ====== 更新错题本 ======
+        function updateWrongSet(index) {
+            const q = questions[index];
+            const ans = userAnswers[index];
+            if (ans === undefined) return;
+            if (isAnswerCorrect(q, ans)) {
+                wrongSet.delete(index);
+            } else {
+                wrongSet.add(index);
+            }
+            // 更新错题本标签上的数量
+            const wrongBtn = document.getElementById('wrongTabBtn');
+            if (wrongBtn) wrongBtn.textContent = '❌ 错题本' + (wrongSet.size > 0 ? ' (' + wrongSet.size + ')' : '');
+        }
+
+        function clearWrongSet() {
+            if (wrongSet.size === 0) return;
+            if (confirm('确定清除所有错题记录吗？')) {
+                wrongSet.clear();
+                const wrongBtn = document.getElementById('wrongTabBtn');
+                if (wrongBtn) wrongBtn.textContent = '❌ 错题本';
+                updateStats();
+                renderQuestion(currentIndex);
+            }
+        }
+
+        function removeFromWrong(index) {
+            wrongSet.delete(index);
+            const wrongBtn = document.getElementById('wrongTabBtn');
+            if (wrongBtn) wrongBtn.textContent = '❌ 错题本' + (wrongSet.size > 0 ? ' (' + wrongSet.size + ')' : '');
+            // 如果当前在错题本标签，切换到下一题或返回全部
+            if (currentTab === '错题本') {
+                const filtered = questions.filter((_, i) => wrongSet.has(i));
+                if (filtered.length > 0) {
+                    currentIndex = questions.indexOf(filtered[0]);
+                } else {
+                    currentTab = '全部';
+                    currentIndex = 0;
+                    // 重置标签高亮
+                    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                    const allTab = document.querySelector('.tab');
+                    if (allTab) allTab.classList.add('active');
+                }
+            }
+            renderQuestion(currentIndex);
+            updateStats();
+        }
+
+        function selectOption(index, letter) {
+            if (currentMode === 'exam' && examSubmitted) return;
+            userAnswers[index] = letter;
+            if (currentMode === 'practice') updateWrongSet(index);
+            renderQuestion(index);
+            updateStats();
+        }
+
+        function toggleAnswer(index) {
+            showAnswers = !showAnswers;
+            renderQuestion(index);
+        }
+
+        // ====== 答案对比（支持数组/字符串，忽略大小写和首尾空白） ======
+        function isAnswerCorrect(question, userAnswer) {
+            if (userAnswer === undefined || userAnswer === null) return false;
+            // 编程题：包含匹配（用户代码包含参考答案关键内容即可）
+            if (question.type === '程序设计') {
+                if (!userAnswer) return false;
+                const expected = String(question.answer || '').trim().toLowerCase();
+                const user = String(userAnswer).trim().toLowerCase();
+                return user.includes(expected) || expected.includes(user);
+            }
+            if (Array.isArray(question.answer)) {
+                if (!Array.isArray(userAnswer)) return false;
+                if (question.answer.length !== userAnswer.length) return false;
+                return question.answer.every((a, i) => {
+                    const expected = String(a || '').trim().toLowerCase();
+                    const user = String(userAnswer[i] || '').trim().toLowerCase();
+                    return expected === user;
+                });
+            }
+            const expected = String(question.answer).trim().toLowerCase();
+            const user = String(userAnswer).trim().toLowerCase();
+            return expected === user;
+        }
+
+        // ====== 保存填空答案 ======
+        function saveBlankAnswer(index, blankIdx, value) {
+            if (!Array.isArray(userAnswers[index])) {
+                userAnswers[index] = [];
+            }
+            userAnswers[index][blankIdx] = value;
+            if (currentMode === 'practice') updateWrongSet(parseInt(index));
+            renderQuestion(parseInt(index));
+            updateStats();
+        }
+
+        // ====== 保存编程题代码 ======
+        function saveCodeAnswer(index, textarea) {
+            userAnswers[index] = textarea.value;
+            if (currentMode === 'practice') updateWrongSet(parseInt(index));
+            updateStats();
+        }
+
+        // ====== 更新代码编辑器行号 ======
+        function updateLineNums(index, textarea) {
+            const lines = textarea.value.split('\n').length;
+            const numsEl = document.getElementById('lineNums_' + index);
+            if (numsEl) {
+                let html = '';
+                for (let i = 1; i <= Math.max(lines, 1); i++) html += '<span>' + i + '</span>';
+                numsEl.innerHTML = html;
+            }
+        }
+
+        function prevQuestion() {
+            if (currentIndex > 0) {
+                currentIndex--;
+                showAnswers = false;
+                renderQuestion(currentIndex);
+            }
+        }
+
+        function nextQuestion() {
+            if (currentIndex < questions.length - 1) {
+                currentIndex++;
+                showAnswers = false;
+                renderQuestion(currentIndex);
+            }
+        }
+
+        function updateNavButtons() {
+            document.getElementById('prevBtn').disabled = currentIndex === 0;
+            document.getElementById('nextBtn').disabled = currentIndex === questions.length - 1;
+        }
+
+        function updateStats() {
+            const total = questions.length;
+            const answered = Object.keys(userAnswers).length;
+            const progress = Math.round((answered / total) * 100);
+            document.getElementById('totalQuestions').textContent = total;
+            document.getElementById('answeredCount').textContent = answered;
+            document.getElementById('progressPercent').textContent = `${progress}%`;
+            document.getElementById('progressFill').style.width = `${progress}%`;
+            let score = 0;
+            Object.keys(userAnswers).forEach(index => {
+                const q = questions[index];
+                if (isAnswerCorrect(q, userAnswers[index])) score += q.score;
+            });
+            document.getElementById('currentScore').textContent = score;
+            
+            // 错题本统计
+            document.getElementById('wrongCount').textContent = wrongSet.size;
+            const wrongBtn = document.getElementById('wrongTabBtn');
+            if (wrongBtn) wrongBtn.textContent = '❌ 错题本' + (wrongSet.size > 0 ? ' (' + wrongSet.size + ')' : '');
+            const clearBtn = document.getElementById('clearWrongBtn');
+            if (clearBtn) clearBtn.style.display = wrongSet.size > 0 && currentMode === 'practice' ? 'inline-block' : 'none';
+        }
+
+        function submitAnswers() {
+            if (currentMode === 'exam') {
+                examSubmitted = true;
+                stopTimer();
+            }
+            let correct = 0, totalScore = 0;
+            questions.forEach((q, i) => {
+                totalScore += q.score;
+                if (isAnswerCorrect(q, userAnswers[i])) correct++;
+            });
+            const earnedScore = questions.reduce((sum, q, i) => sum + (isAnswerCorrect(q, userAnswers[i]) ? q.score : 0), 0);
+            const accuracy = Math.round((correct / questions.length) * 100);
+            let grade = accuracy >= 90 ? '优秀 🎉' : accuracy >= 80 ? '良好 👍' : accuracy >= 60 ? '及格 ✅' : '需努力 💪';
+            document.getElementById('finalScore').textContent = `${earnedScore} / ${totalScore}`;
+            document.getElementById('resultText').textContent = `答对 ${correct} 题，共 ${questions.length} 题\n正确率：${accuracy}%\n评价：${grade}`;
+            document.getElementById('overlay').classList.add('show');
+            document.getElementById('resultModal').classList.add('show');
+        }
+
+        function closeResult() {
+            document.getElementById('overlay').classList.remove('show');
+            document.getElementById('resultModal').classList.remove('show');
+        }
+
+        init();
+        
+        // 异步加载旧题库并合并
+        (function() {
+            const scripts = [
+                '../新建文件夹/yuanbao_javascript_20260611_5inp82.js',
+                '../新建文件夹/yuanbao_javascript_20260611_8jicZf.js',
+                '../新建文件夹/yuanbao_javascript_20260611_HXNSAj.js',
+                '../新建文件夹/yuanbao_javascript_20260611_QSzK8M.js',
+                '../新建文件夹/yuanbao_javascript_20260611_mtR7Ac.js'
+            ];
+            let loaded = 0;
+            
+            function escapeHtml(text) {
+                if (!text) return '';
+                return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            }
+            
+            function getQuestionKey(q) {
+                const text = (q.title || q.question || '') + (q.codeTemplate || '');
+                return text.replace(/\s+/g, '').substring(0, 100);
+            }
+            
+            function addLegacyQuestion(q) {
+                const key = getQuestionKey(q);
+                if (!questions._seenKeys.has(key)) {
+                    questions._seenKeys.add(key);
+                    const score = q.score || 2;
+                    if (q.type === '单选') {
+                        questions.push({
+                            type: '单选', id: questions.length + 1, score: score,
+                            question: q.title || q.question,
+                            options: q.options,
+                            answer: q.answer,
+                            analysis: q.analysis
+                        });
+                    } else if (q.type === '填空') {
+                        questions.push({
+                            type: '填空', id: questions.length + 1, score: score,
+                            question: q.title || q.question,
+                            answer: Array.isArray(q.answer) ? q.answer : [q.answer],
+                            analysis: q.analysis
+                        });
+                    } else {
+                        const code = '';
+                        const titleText = q.title || '';
+                        const analysis = Array.isArray(q.analysis) ? q.analysis.join('<br>') : q.analysis;
+                        questions.push({
+                            type: q.type, id: questions.length + 1, score: score,
+                            title: titleText,
+                            question: titleText + (code ? '<br><br>' + code : ''),
+                            answer: Array.isArray(q.answer) ? q.answer : (q.answer || ''),
+                            analysis: analysis
+                        });
+                    }
+                }
+            }
+            
+            function loadNext(index) {
+                if (index >= scripts.length) {
+                    // 所有文件加载完成
+                    questions.forEach((q, i) => q.id = i + 1);
+                    console.log('题库合并完成，共 ' + questions.length + ' 道题');
+                    renderTabs();
+                    renderQuestion(0);
+                    updateStats();
+                    return;
+                }
+                
+                // 保存当前questions（来自pythonExamBank）
+                const savedQuestions = questions.slice();
+                
+                const script = document.createElement('script');
+                script.src = scripts[index];
+                script.onload = () => {
+                    // 全局questions已被legacy JS覆盖，现在包含legacy题目
+                    if (typeof questions !== 'undefined' && questions.length > 0) {
+                        // 找出新增的legacy题目（通过比较）
+                        const savedIds = new Set(savedQuestions.map(q => getQuestionKey(q)));
+                        questions.forEach(q => {
+                            if (!savedIds.has(getQuestionKey(q))) {
+                                addLegacyQuestion(q);
+                            }
+                        });
+                    }
+                    // 恢复pythonExamBank的questions
+                    questions = savedQuestions;
+                    loadNext(index + 1);
+                };
+                script.onerror = () => {
+                    console.warn('加载失败:', scripts[index]);
+                    questions = savedQuestions;
+                    loadNext(index + 1);
+                };
+                document.head.appendChild(script);
+            }
+            
+            // 初始化seenKeys
+            if (!questions._seenKeys) questions._seenKeys = new Set();
+            
+            // 开始加载
+            setTimeout(loadNext, 100);
+        })();
+    </script>
+</body>
+</html>
